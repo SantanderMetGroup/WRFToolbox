@@ -327,10 +327,15 @@
         if (rcode .ne. nf_noerr) call handle_err(rcode)
         if (bit64) then
           rcode = nf_create(output_file, NF_64BIT_OFFSET, mcid)
+          rcode = nf_put_att_text(mcid, nf_global, "FILE_TYPE", 13, "64_BIT_OFFSET")
         elseif (output_netCDF4) then
           rcode = nf_create(output_file, IOR(NF_NETCDF4, NF_CLASSIC_MODEL), mcid)
+          rcode = nf_put_att_text(mcid, nf_global, "FILE_TYPE", 21, "NETCDF4_CLASSIC_MODEL")
+        elseif (output_netCDF4 .and. bit64) then
+          PRINT *, "bit64 and output_netCDF4 options cannot be both set at the same time"
         else
           rcode = nf_create(output_file, 0, mcid)
+          rcode = nf_put_att_text(mcid, nf_global, "FILE_TYPE", 7, "CLASSIC")
         endif
         if (rcode .ne. nf_noerr) call handle_err(rcode)
 
@@ -701,6 +706,7 @@ rcode = nf_enddef(mcid)
           rcode = nf_def_var(mcid, cval, itype, idm, jshape, jvar)
           IF (output_netCDF4) THEN
             rcode = nf_def_var_deflate(mcid, jvar, 1, 1, 3)
+            rcode = nf_put_att_int(mcid, nf_global, "DEFLATE_LEVEL", NF_INT, 1, 3)
           ENDIF
           PRINT *,'jvar4b: ',jvar
 
@@ -2339,6 +2345,7 @@ END SUBROUTINE spatialfiltering
          rcode = nf_def_var(mcid, trim(cval), NF_REAL, idm, jshape, jvar)
          IF (output_netCDF4) THEN
            rcode = nf_def_var_deflate(mcid, jvar, 1, 1, 3)
+           rcode = nf_put_att_int(mcid, nf_global, "DEFLATE_LEVEL", NF_INT, 1, 3)
            IF (rcode  /= nf_noerr) THEN
              PRINT *, "ERROR SETTING THE DEFLATE LEVEL"
              PRINT *, rcode
