@@ -4,9 +4,18 @@
 !  November 2007 - Cindy Bruyere
 !  December 2009 - Lluis Fita (Santander Meteorolgy Group, Univ. Cantabria)
 !  January 2012 - J. Fernandez (Santander Meteorolgy Group, Univ. Cantabria) -> jf
+!  March 2012 - M. Garcia-Diez (Santander Meteorolgy Group, Univ. Cantabria) 
 !
 !=================================Make Executable============================
 !  Make executable:
+!
+!  GMS Intel 11.1 with static netCDF4 and HDF5 libraries
+!
+! use intel
+! export NETCDF_DIR=
+! export HDF5_DIR=
+! ifort -O3  p_interp.F90 -o p_interp -I$NETCDF_DIR/include -I$HDF5_DIR/include \
+! -Bstatic -L$NETCDF_DIR/lib -lnetcdf -lnetcdff -L$HDF5_DIR/lib -lnetcdf -lhdf5_hl -lhdf5 -lz
 !
 !  GMS.UC.new:
 !      gfortran p_interp.F90 -L/software/CentOS/5.2/netcdf/4.1.1/gcc-gfortran4.1.2/lib -lnetcdf \
@@ -130,9 +139,10 @@
       LOGICAL                                            :: unstagvar
       INTEGER                                            :: idim
       REAL, ALLOCATABLE, DIMENSION(:,:,:,:,:)            :: data4
- 
+! GMS.UC: Markel March 2012 
+      LOGICAL                                            :: output_netCDF4=.FALSE.
       NAMELIST /io/ path_to_input, input_name, path_to_output, output_name,                     &
-        process, fields, debug, bit64, grid_filt, ntimes_filt, path_to_geofile, geofile
+        process, fields, debug, bit64, output_netCDF4, grid_filt, ntimes_filt, path_to_geofile, geofile
       NAMELIST /interp_in/ interp_levels, interp_method, extrapolate, unstagger_grid, p_top
 
       path_to_input   = './'
@@ -317,6 +327,8 @@
         if (rcode .ne. nf_noerr) call handle_err(rcode)
         if (bit64) then
           rcode = nf_create(output_file, NF_64BIT_OFFSET, mcid)
+        elseif (output_netCDF4) then
+          rcode = nf_create(output_file, IOR(NF_NETCDF4, NF_CLASSIC_MODEL), mcid)
         else
           rcode = nf_create(output_file, 0, mcid)
         endif
@@ -687,6 +699,9 @@ rcode = nf_enddef(mcid)
 	  PRINT *,'var defD: ', jshape
 	  PRINT *,'var defE: ', jvar
           rcode = nf_def_var(mcid, cval, itype, idm, jshape, jvar)
+          IF (output_netCDF4) THEN
+            rcode = nf_def_var_deflate(mcid, jvar, 1, 1, 3)
+          ENDIF
           PRINT *,'jvar4b: ',jvar
 
           DO na = 1, natt
@@ -870,7 +885,7 @@ rcode = nf_enddef(mcid)
            longdescIN='Pressure levels'
            unitsIN='Pa'
            CALL def_var (mcid, jvar, varnameIN, 5, 1, jshape1d, "Z", longdescIN, unitsIN, "-", &
-             "XLONG XLAT")
+             "XLONG XLAT", output_netCDF4)
            IF (debug) THEN
              write(6,*) 'VAR: PLEV idvar:',jvar
              write(6,*) '     DIMS OUT: ',dims1d_out
@@ -891,7 +906,7 @@ rcode = nf_enddef(mcid)
            unitsIN='Pa'
 
            CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-", &
-             "XLONG XLAT")
+             "XLONG XLAT", output_netCDF4)
            IF (debug) THEN
              write(6,*) 'VAR: MSLP idvar:',jvar
              write(6,*) '     DIMS OUT: ',dims2d_out
@@ -911,7 +926,7 @@ rcode = nf_enddef(mcid)
            longdescIN='MSLP filtered 10 times 3x3'
            unitsIN='Pa'
 
-           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-", "XLONG XLAT")
+           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-", "XLONG XLAT", output_netCDF4)
            IF (ALLOCATED(data3)) DEALLOCATE(data3)
            ALLOCATE (data3(dims_out(1), dims_out(2), dims_out(4), 1))
            CALL spatialfiltering(data2, grid_filt, ntimes_filt, dims_out(1), dims_out(2),       &
@@ -933,7 +948,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Accumulated total precipitation'
           unitsIN='mm'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           IF (ALLOCATED(data3)) DEALLOCATE(data3)
           ALLOCATE (data3(dims_out(1), dims_out(2), dims_out(4), 1))
           IF (ALLOCATED(varnames)) DEALLOCATE(varnames)
@@ -957,7 +972,7 @@ rcode = nf_enddef(mcid)
            unitsIN='Pa'
 
            CALL def_var (mcid, jvar, varnameIN, 5, 4, jshape, "XZY", longdescIN, unitsIN,       &
-             "-", "XLONG XLAT")
+             "-", "XLONG XLAT", output_netCDF4)
            IF (debug) THEN
              write(6,*) 'VAR: PRES idvar:',jvar
              write(6,*) '     DIMS OUT: ',dims_out
@@ -975,7 +990,7 @@ rcode = nf_enddef(mcid)
            unitsIN='K'
 
            CALL def_var (mcid, jvar, varnameIN, 5, 4, jshape, "XZY", longdescIN, unitsIN,       &
-             "-", "XLONG XLAT")
+             "-", "XLONG XLAT", output_netCDF4)
            IF (debug) THEN
              write(6,*) 'VAR: TT idvar:',jvar
              write(6,*) '     DIMS OUT: ',dims_out
@@ -1000,7 +1015,7 @@ rcode = nf_enddef(mcid)
            unitsIN='m'
 
            CALL def_var (mcid, jvar, varnameIN, 5, 4, jshape, "XZY", longdescIN, unitsIN, "-",  &
-             "XLONG XLAT")
+             "XLONG XLAT", output_netCDF4)
            IF (debug) THEN
              write(6,*) 'VAR: GHT idvar:',jvar
              write(6,*) '     DIMS OUT: ',dims_out
@@ -1024,7 +1039,7 @@ rcode = nf_enddef(mcid)
            longdescIN='Relative Humidity'
            unitsIN='%'
            CALL def_var (mcid, jvar, varnameIN, 5, 4, jshape, "XZY", longdescIN, unitsIN, "-",  &
-             "XLONG XLAT")
+             "XLONG XLAT", output_netCDF4)
            IF (debug) THEN
              write(6,*) 'VAR: RH idvar:',jvar
              write(6,*) '     DIMS OUT: ',dims_out
@@ -1066,7 +1081,7 @@ rcode = nf_enddef(mcid)
           longdescIN='PBL height (1.5-theta-increase method)'
           unitsIN='m'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           IF (ALLOCATED(data3)) DEALLOCATE(data3)
           ALLOCATE (data3(dims2d_out(1), dims2d_out(2), dims2d_out(3), 1))
           CALL pbl_height(ncid, debug, dims_in(1), dims_in(2), dims_in(3), dims_in(4), ght, ter, data3)
@@ -1103,7 +1118,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Vertically integrated moisture'
           unitsIN='Kg m-2'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           IF (ALLOCATED(data3)) DEALLOCATE(data3)
           ALLOCATE (data3(dims2d_out(1), dims2d_out(2), dims2d_out(3), 1))
           CALL massvertint(ncid, (/'QVAPOR     '/), 1, debug, dims_in(1), dims_in(2), dims_in(3),&
@@ -1136,7 +1151,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Vertically integrated cloud water'
           unitsIN='Kg m-2'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           IF (ALLOCATED(data3)) DEALLOCATE(data3)
           ALLOCATE (data3(dims_in(1), dims_in(2), dims_in(4), 1))
           CALL massvertint(ncid, (/'QCLOUD     '/), 1, debug, dims_in(1), dims_in(2), dims_in(3),&
@@ -1179,7 +1194,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Vertically integrated wind WE'
           unitsIN='s-1 m-1'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           rcode = nf_put_vara_real (mcid, jvar, start_dims, dims2d_out, data3(:,:,:,1))
           CALL error_nc(section, rcode)
           IF (debug) PRINT *, '  VIU. SAMPLE VALUE OUT = ',data3(dims_out(1)/2,dims_out(2)/2,1,1)
@@ -1188,7 +1203,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Vertically integrated wind SN'
           unitsIN='s-1 m-1'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           rcode = nf_put_vara_real (mcid, jvar, start_dims, dims2d_out, data3(:,:,:,2))
           call error_nc(section, rcode)
           IF (debug) PRINT *, '  VIV. SAMPLE VALUE OUT = ',data3(dims_out(1)/2,dims_out(2)/2,1,2)
@@ -1197,7 +1212,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Vertically integrated wind bottom-top'
           unitsIN='s-1 m-1'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           rcode = nf_put_vara_real (mcid, jvar, start_dims, dims2d_out, data3(:,:,:,3))
           call error_nc(section, rcode)
           IF (debug) PRINT *, '  VIW. SAMPLE VALUE OUT = ',data3(dims_out(1)/2,dims_out(2)/2,1,3)
@@ -1233,7 +1248,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Vertically integrated transport WE of moist'
           unitsIN='kg s-1 m-1'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           rcode = nf_put_vara_real (mcid, jvar, start_dims, dims2d_out, data4(:,:,:,1,1))
           IF (debug) PRINT *, '  VIMU. SAMPLE VALUE OUT = ',data4(dims_out(1)/2,dims_out(2)/2,1,1,1)
           jvar = jvar + 1
@@ -1241,7 +1256,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Vertically integrated transport SN of moist'
           unitsIN='kg s-1 m-1'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           rcode = nf_put_vara_real (mcid, jvar, start_dims, dims2d_out, data4(:,:,:,1,2))
           IF (debug) PRINT *, '  VIMV. SAMPLE VALUE OUT = ',data4(dims_out(1)/2,dims_out(2)/2,1,1,2)
           jvar = jvar + 1
@@ -1249,7 +1264,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Vertically integrated transport bottom-top of moist'
           unitsIN='kg s-1 m-1'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           rcode = nf_put_vara_real (mcid, jvar, start_dims, dims2d_out, data4(:,:,:,1,3))
           IF (debug) PRINT *, '  VIMV. SAMPLE VALUE OUT = ',data4(dims_out(1)/2,dims_out(2)/2,1,1,3)
           DEALLOCATE(data4)
@@ -1273,7 +1288,7 @@ rcode = nf_enddef(mcid)
           longdescIN='Vertically integrated cloud ice'
           unitsIN='Kg m-2'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           IF (ALLOCATED(data3)) DEALLOCATE(data3)
           ALLOCATE (data3(dims_in(1), dims_in(2), dims_in(4), 1))
           CALL massvertint(ncid, (/'QICE       '/), 1, debug, dims_in(1), dims_in(2), dims_in(3),&
@@ -1320,7 +1335,7 @@ rcode = nf_enddef(mcid)
           longdescIN='total cloud fraction'
           unitsIN='1'
           CALL def_var (mcid, jvar, varnameIN, 5, 3, jshape2d, "XY", longdescIN, unitsIN, "-"   &
-            , "XLONG XLAT")
+            , "XLONG XLAT", output_netCDF4)
           rcode = nf_put_vara_real (mcid, jvar, start_dims, dims2d_out, data4(:,:,:,1,1))
           IF (debug) PRINT *, '  CLT. SAMPLE VALUE OUT = ',data4(dims_out(1)/2,dims_out(2)/2,1,1,1)
           DEALLOCATE(data4)
@@ -2295,7 +2310,7 @@ END SUBROUTINE spatialfiltering
  END SUBROUTINE all_spaces
 
 !------------------------------------------------------------------------------
- SUBROUTINE def_var (mcid, jvar, cval, itype, idm, jshape, order, desc, units, stag, coord )
+ SUBROUTINE def_var (mcid, jvar, cval, itype, idm, jshape, order, desc, units, stag, coord, output_netCDF4 )
 
       IMPLICIT NONE
 
@@ -2306,7 +2321,7 @@ END SUBROUTINE spatialfiltering
       CHARACTER (LEN =  11)                           :: cval
       INTEGER                                         :: itype, idm
       REAL, DIMENSION(6)                              :: jshape
-      CHARACTER (LEN =  3)                            :: order
+      CHARACTER (*)                                   :: order
 ! GMS.UC: Lluis Dec.09      
       CHARACTER (LEN = 60)                            :: desc
       CHARACTER (LEN = 10)                            :: units
@@ -2316,13 +2331,21 @@ END SUBROUTINE spatialfiltering
       INTEGER                                         :: rcode, ilen
 ! GMS.UC: Lluis Dec.09
       CHARACTER (LEN=60)                              :: att_text
+! GMS.UC Markel March 2012
+      LOGICAL                                         :: output_netCDF4
 
       IF ( itype == 5 ) THEN
          rcode = nf_redef(mcid)
          rcode = nf_def_var(mcid, trim(cval), NF_REAL, idm, jshape, jvar)
+         IF (output_netCDF4) THEN
+           rcode = nf_def_var_deflate(mcid, jvar, 1, 1, 3)
+           IF (rcode  /= nf_noerr) THEN
+             PRINT *, "ERROR SETTING THE DEFLATE LEVEL"
+             PRINT *, rcode
+           ENDIF
+         ENDIF
          rcode = nf_put_att_int(mcid, jvar, "FieldType", NF_INT, 1, 104)
       ENDIF
-
       att_text = order
       ilen = len_trim(att_text)
       rcode = nf_put_att_text(mcid, jvar, "MemoryOrder", ilen, att_text(1:ilen) )
