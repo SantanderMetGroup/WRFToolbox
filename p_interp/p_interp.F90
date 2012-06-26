@@ -9,13 +9,13 @@
 !=================================Make Executable============================
 !  Make executable:
 !
-!  GMS Intel 11.1 with static netCDF4 and HDF5 libraries
+!  GMS Intel 11.1 with static netCDF4 and HDF5 libraries (it crashes if compiled without -heap-arrays)
 !
-! use intel
-! export NETCDF_DIR=
-! export HDF5_DIR=
-! ifort -O3  p_interp.F90 -o p_interp -I$NETCDF_DIR/include -I$HDF5_DIR/include \
-! -Bstatic -L$NETCDF_DIR/lib -lnetcdf -lnetcdff -L$HDF5_DIR/lib -lnetcdf -lhdf5_hl -lhdf5 -lz
+!  use intel
+!  export NETCDF_DIR=
+!  export HDF5_DIR=
+!  ifort -heap-arrays p_interp.F90 -o p_interp -I$NETCDF_DIR/include -I$HDF5_DIR/include \
+!  -Bstatic -L$NETCDF_DIR/lib -lnetcdf -lnetcdff -L$HDF5_DIR/lib -lnetcdf -lhdf5_hl -lhdf5 -lz
 !
 !  GMS.UC.new:
 !      gfortran p_interp.F90 -L/software/CentOS/5.2/netcdf/4.1.1/gcc-gfortran4.1.2/lib -lnetcdf \
@@ -1986,88 +1986,98 @@ ENDDO
 END SUBROUTINE spatialfiltering
 
 !------------------------------------------------------------------------------
- SUBROUTINE mean_sealevelpress (data_out, pres_field, interp_levels, psfc, ter, tk, qv, ix, iy, iz, it, ito, &
+SUBROUTINE mean_sealevelpress (data_out, pres_field, interp_levels, psfc, ter, tk, qv, ix, iy, iz, it, ito, &
         num_metgrid_levels, LINLOG, extrapolate, MISSING)
 ! New subroutine to compute mean_sealevel pressure values 
 
-     INTEGER, INTENT(IN)                                           :: ix, iy, iz, it, ito
-     INTEGER, INTENT(IN)                                           :: num_metgrid_levels, LINLOG
-     REAL, DIMENSION(ix, iy, ito, 1), INTENT(OUT)                  :: data_out
-     REAL, DIMENSION(ix, iy, iz, ito), INTENT(IN)                  :: pres_field, tk, qv
-     REAL, DIMENSION(ix, iy, ito), INTENT(IN)                      :: psfc
-     REAL, DIMENSION(ix, iy), INTENT(IN)                           :: ter
-     REAL, DIMENSION(num_metgrid_levels), INTENT(IN)               :: interp_levels
+    INTEGER, INTENT(IN)                                           :: ix, iy, iz, it, ito
+    INTEGER, INTENT(IN)                                           :: num_metgrid_levels, LINLOG
+    REAL, DIMENSION(ix, iy, ito, 1), INTENT(OUT)                  :: data_out
+    REAL, DIMENSION(ix, iy, iz, ito), INTENT(IN)                  :: pres_field, tk, qv
+    REAL, DIMENSION(ix, iy, ito), INTENT(IN)                      :: psfc
+    REAL, DIMENSION(ix, iy), INTENT(IN)                           :: ter
+    REAL, DIMENSION(num_metgrid_levels), INTENT(IN)               :: interp_levels
 
-     INTEGER                                                       :: i, j, itt, k, kk, kin
-     REAL, DIMENSION(num_metgrid_levels)                           :: data_out1D
-!     REAL, DIMENSION(iz)                                           :: data_in1D, pres_field1D
-     INTEGER, INTENT(IN)                                           :: extrapolate
-     REAL, INTENT(IN)                                              :: MISSING
+    INTEGER                                                       :: i, j, itt, k, kk, kin
+    REAL, DIMENSION(num_metgrid_levels)                           :: data_out1D
+!   REAL, DIMENSION(iz)                                           :: data_in1D, pres_field1D
+    INTEGER, INTENT(IN)                                           :: extrapolate
+    REAL, INTENT(IN)                                              :: MISSING
 
-     N = 1.0
+    N = 1.0
 
-     expon=287.04*.0065/9.81
+    expon = 287.04*.0065/9.81
 
-     ! Fill in missing values
-     IF ( extrapolate == 0 ) RETURN       !! no extrapolation - we are out of here
+!   Fill in missing values
+    IF ( extrapolate == 0 ) RETURN       !! no extrapolation - we are out of here
 
-     ! First find where about 400 hPa is located
-     kk = 0
-     find_kk : do k = 1, num_metgrid_levels
-        kk = k
-        if ( interp_levels(k) <= 40000. ) exit find_kk
-     end do find_kk
+!   First find where about 400 hPa is located
+    kk = 0
+    find_kk : do k = 1, num_metgrid_levels
+      kk = k
+      if ( interp_levels(k) <= 40000. ) exit find_kk
+    end do find_kk
 
-     data_out=0.
-     do itt = 1, ito
-       do j = 1, iy
-       do i = 1, ix
+    data_out = 0.
+    do itt = 1, ito
+      do j = 1, iy
+        do i = 1, ix
 
-!                We are below both the ground and the lowest data level.
+!         We are below both the ground and the lowest data level.
 
-!                First, find the model level that is closest to a "target" pressure
-!                level, where the "target" pressure is delta-p less that the local
-!                value of a horizontally smoothed surface pressure field.  We use
-!                delta-p = 150 hPa here. A standard lapse rate temperature profile
-!                passing through the temperature at this model level will be used
-!                to define the temperature profile below ground.  This is similar
-!                to the Benjamin and Miller (1990) method, using  
-!                700 hPa everywhere for the "target" pressure.
+!         First, find the model level that is closest to a "target" pressure
+!         level, where the "target" pressure is delta-p less that the local
+!         value of a horizontally smoothed surface pressure field.  We use
+!         delta-p = 150 hPa here. A standard lapse rate temperature profile
+!         passing through the temperature at this model level will be used
+!         to define the temperature profile below ground.  This is similar
+!         to the Benjamin and Miller (1990) method, using  
+!         700 hPa everywhere for the "target" pressure.
 
-!         ptarget = (psfc(i,j,itt)*.01) - 150.
-         ptarget = 700.
-         dpmin=1.e4
-         kupper = 0
-         loop_kIN : do kin=iz,1,-1
-           kupper = kin
-           dp=abs( (pres_field(i,j,kin,itt)*.01) - ptarget )
-           if (dp.gt.dpmin) exit loop_kIN
-             dpmin=min(dpmin,dp)
-           enddo loop_kIN
-         ptarget=ptarget*100.
-!         pbot=max(pres_field(i,j,1,itt),psfc(i,j,itt))
-!         zbot=0.
+          ptarget = (psfc(i,j,itt)*.01) - 150.
+          dpmin = 1.e4
+          kupper = 0
+          loop_kIN : do kin = iz,1,-1
+            kupper = kin
+            dp=abs( (pres_field(i, j, kin, itt)*.01) - ptarget )
+            if (dp.gt.dpmin) exit loop_kIN
+            dpmin=min(dpmin, dp)
+          enddo loop_kIN
+          ptarget=ptarget*100.
+         
+          if (pres_field(i, j, kupper + 1, itt) - ptarget .ge. 0) then
+            kupper = kupper + 1
+          endif
+!
+!         García-Díez 2012-06
+!         The reference level temperature and specific humidity at ptarget are computed by
+!         linear interpolation, so there is no jump when the selected eta level changes.
+!
+          tkint = (tk(i, j, kupper, itt)*abs(ptarget - pres_field(i, j, kupper, itt)) + &
+          tk(i, j, kupper + 1, itt)*abs(ptarget - pres_field(i, j, kupper + 1, itt)))/abs(pres_field(i, j, kupper, itt) - pres_field(i, j, kupper + 1, itt))
 
-!         tbotextrap=tk(i,j,kupper,itt)*(pbot/pres_field(i,j,kupper,itt))**expon
-!         tvbotextrap=virtual(tbotextrap,qv(i,j,1,itt))
+          qvint = (qv(i, j, kupper, itt)*abs(ptarget - pres_field(i, j, kupper, itt)) + &
+          qv(i, j, kupper + 1, itt)*abs(ptarget - pres_field(i, j, kupper + 1, itt)))/abs(pres_field(i, j, kupper, itt) - pres_field(i, j, kupper + 1, itt)) 
 
-!         data_out(i,j,itt,1) = (zbot+tvbotextrap/.0065*(1.-(interp_levels(1)/pbot)**expon))
-         tbotextrap=tk(i,j,kupper,itt)*(psfc(i,j,itt)/ptarget)**expon
-         tvbotextrap=virtual(tbotextrap,qv(i,j,kupper,itt))
-         data_out(i,j,itt,1) = psfc(i,j,itt)*((tvbotextrap+0.0065*ter(i,j))/tvbotextrap)**(1/expon)
-         IF (i==ix/2 .AND. j==iy/2 ) THEN
-!         IF (ter(i,j) > 2500.) THEN
-           PRINT *,itt,' ptarget',ptarget,'kupper:',kupper
-           PRINT *,'tk:',tk(i,j,kupper,itt),'psfc:',psfc(i,j,itt)
-           PRINT *,'tbot:',tbotextrap,'tvbot:',tvbotextrap,'ter:',ter(i,j)
-           PRINT *,'qv:',qv(i,j,kupper,itt),'mslp:',data_out(i,j,itt,1)
-         ENDIF
+          tbotextrap = tkint*(psfc(i, j, itt)/ptarget)**expon
+          tvbotextrap = virtual(tbotextrap, qvint)
+          data_out(i, j, itt, 1) = psfc(i, j, itt)*((tvbotextrap + 0.0065*ter(i, j))/tvbotextrap)**(1/expon)
+!         IF (i==INT(ix/2) .AND. j==INT(iy/2) ) THEN
+!         IF (i==54 .AND. j==134) THEN
+!         IF (ter(i,j) > 1500.) THEN
+!           PRINT *, 'pkupper - 1:', pres_field(i,j,kupper - 1,itt), 'pkupper:', pres_field(i,j,kupper,itt), 'pkupper + 1:', pres_field(i,j,kupper + 1,itt), 'pkupper + 2:', pres_field(i,j,kupper + 2,itt)
+!           PRINT *, 'tk kupper:', tk(i,j,kupper,itt), 'tk kupper + 1:', tk(i,j,kupper + 1,itt), 'tkint:', tkint
+!           PRINT *, 'qv kupper:', qv(i,j,kupper,itt), 'qv kupper + 1:', qv(i,j,kupper + 1,itt), 'qvint:', qvint
+!           PRINT *,itt,' ptarget',ptarget,'kupper:',kupper
+!           PRINT *,'tk:',tk(i,j,kupper,itt),'psfc:',psfc(i,j,itt)
+!           PRINT *,'tbot:',tbotextrap,'tvbot:',tvbotextrap,'ter:',ter(i,j)
+!           PRINT *,'qv:',qv(i,j,kupper,itt),'mslp:',data_out(i,j,itt,1)
+!         ENDIF
+        enddo ! i
+      enddo ! j
+    enddo ! itt
 
-       enddo
-       enddo
-     enddo
-
- END SUBROUTINE mean_sealevelpress 
+END SUBROUTINE mean_sealevelpress 
 
 !------------------------------------------------------------------------------
 !------------------------------------------------------------------------------
