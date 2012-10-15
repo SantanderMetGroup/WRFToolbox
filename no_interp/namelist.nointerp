@@ -1,0 +1,20 @@
+&io
+  path_to_input            = '/oceano/gmeteo/users/lluis/bustia/',
+  input_name               = 'wrfout_d01_2001-11-23_18:00:00',
+  path_to_output           = '.',
+  fields                   = 'RAINTOT,U,V,QVAPOR,T2,Q2,PSFC,U10,V10,SINALPHA,COSALPHA,CLT,SFCEVP,POTEVP,QFX,GLW,SWDOWN,HGT,PH,PHB,GHT,T,PRES,MSLP,PLEV,GSW,ALBEDO,ACLWDNB,ACSWDNB,SST,TSK,SKINTEMP,GRDFLX,OLR,ACLWDNT,ACSWDNT,ACSWUPT,ACLWUPT,CLDFRA,LH,ACLHF,HFX,ACHFX,ACSWUPB,ACLWUPB,EMISS,TSLB,PBLH,LANDMASK,UST,AL,ALT,ALB,REGIME,RMOL,Times',
+  process                  = 'list',
+  debug                    = .TRUE.,
+  grid_filt                = 3,
+  ntimes_filt              = 10,
+/
+  path_to_input            = 'Diagnostics',
+  input_name               = 'wrfout_d01_19760217T000000Z.nc',
+
+&interp_in
+  Netalevs                 = 5,
+  firsteta                 = .TRUE.,
+  eta_levels               = 1, 2, 3, 4, 5
+  unstagger_grid           = .TRUE., 
+/
+  p_top                    = 50.,
