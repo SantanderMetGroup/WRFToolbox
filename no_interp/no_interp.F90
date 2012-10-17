@@ -772,7 +772,6 @@ rcode = nf_enddef(mcid)
                 rcode = nf_copy_att(ncid, ivar, cname, mcid, jvar)
              ENDIF
           ENDDO
-          rcode = nf_put_att_real(mcid, jvar, 'missing_value', NF_FLOAT, 1, MISSING)
           rcode = nf_enddef(mcid)
 
 
