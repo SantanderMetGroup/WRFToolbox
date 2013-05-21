@@ -1026,6 +1026,7 @@ rcode = nf_enddef(mcid)
              write(6,*) 'VAR: GHT idvar:',jvar
              write(6,*) '     DIMS OUT: ',dims_out
            ENDIF
+           IF (ALLOCATED(data2)) DEALLOCATE(data2)
            allocate (data2(dims_out(1),dims_out(2),dims_out(3),dims_out(4)))
 ! GMS.UC:Lluis Dec.09
            CALL interpdiag (data2, ght, pres_field, interp_levels, psfc, ter, tk, qv,           &
