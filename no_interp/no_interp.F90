@@ -107,7 +107,6 @@
       REAL                                               :: MISSING=1.e36
       INTEGER                                            :: LINLOG = 1
       INTEGER                                            :: interp_method=1
-      INTEGER                                            :: extrapolate=0
       INTEGER                                            :: Netalevs
       INTEGER                                            :: ncid, mcid, rcode
       INTEGER                                            :: idm, ndims, nvars, natt, ngatts
@@ -1883,7 +1882,6 @@ END SUBROUTINE spatialfiltering
      expon=287.04*.0065/9.81
 
      ! Fill in missing values
-     IF ( extrapolate == 0 ) RETURN       !! no extrapolation - we are out of here
 
      ! First find where about 400 hPa is located
      kk = 0
