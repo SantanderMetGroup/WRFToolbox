@@ -1,0 +1,21 @@
+&io
+  path_to_input            = './',
+  input_name               = 'wrffull_eurocordex044.nc',
+  path_to_output           = '.',
+  fields                   = 'RAINTOT,U10,V10,T2,Q2,TT,MSLP,U,V,ALT,Times,CLT,QCLOUD,PBLHGT,REGIME',
+  process                  = 'list',
+  debug                    = .TRUE.,
+  grid_filt                = 3,
+  ntimes_filt              = 10,
+  output_netCDF4           = .TRUE.,
+/
+  path_to_input            = 'Diagnostics',
+  input_name               = 'wrfout_d01_19760217T000000Z.nc',
+
+&interp_in
+  interz_levels            = 10.,20.,40.,60.,80.,100.,120.,140.,160.,180.,200.
+  extrapolate              = 1,
+  interp_method            = 1,
+  unstagger_grid           = .TRUE., 
+/
+  p_top                    = 50.,
