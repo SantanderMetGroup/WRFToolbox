@@ -1,0 +1,17 @@
+>> Markel Garcia Diez 8 Feb 2013
+
+py_interp is a version of p_interp written in python. It uses the f2py interface
+to call fortran subroutines extracted from the original p_interp. These are located
+in  py_interp_fortran.F90 inside a module call "routines". To make it a python module
+type:
+
+f2py -c py_interp_fortran.F90 -m py_interp_fortran
+
+Check http://pybonacci.wordpress.com/2013/02/22/integrar-fortran-con-python-usando-f2py/
+for a tutorial. It only has been tested in linux Mint with gfortran 4.7.3.
+
+Once compiled, it can be imported into python as a regular python package.
+
+from py_interp_fortran import routines as f90
+
+Usage: type python py_interp.py -h for help.
