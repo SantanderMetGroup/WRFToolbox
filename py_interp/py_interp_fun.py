@@ -105,7 +105,7 @@ def de_stagger(ivarobj, ivardata):
 def interp2plevs(ivar, inc, onc, bf, plevs):
 	ivarobj = inc.variables[ivar]
 	ivardata = ivarobj[:]
-	is_ght = var == "GHT"
+	is_ght = ivar == "GHT"
 	#
 	# Check if the variable is staggered and de-stagger it if necessary
 	#
