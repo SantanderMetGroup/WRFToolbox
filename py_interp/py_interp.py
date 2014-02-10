@@ -4,7 +4,7 @@
 import numpy as np
 import netCDF4 as ncdf
 import os, sys
-from py_interp_fun import copy_n_filter_wrfout, BasicFields, add_pressure_axis, interp2plevs
+from py_interp_fun import copy_n_filter_wrfout, BasicFields, add_pressure_axis, interp2plevs, compute_diagnostic
 from optparse import OptionParser
 #
 # Parse options
@@ -49,17 +49,18 @@ copyvars = []
 interpvars = []
 diags = []
 for v in varlist:
-	vdims = inc.variables[v].dimensions
-	if vdims == dims2D:
-		copyvars.append(v)
-	elif ("bottom_top" in vdims) or ("bottom_top_stag" in vdims):
-		interpvars.append(v)
-	elif v in diags:
+	if v in diagnostics:
 		diags.append(v)
 	else:
-		print "Error: Variable %s not found in file, and is not a diagnostic" % var
-		print "Available diagnostics: None!"
-		sys.exit(1)
+		vdims = inc.variables[v].dimensions
+		if vdims == dims2D:
+			copyvars.append(v)
+		elif ("bottom_top" in vdims) or ("bottom_top_stag" in vdims):
+			interpvars.append(v)
+		else:
+			print "Error: Variable %s not found in file, and is not a diagnostic" % var
+			print "Available diagnostics: None!"
+			sys.exit(1)
 if opt.verbose:
 	print "2D variables %s" % copyvars
 	print "3D variables to interpolate %s" % interpvars
@@ -87,6 +88,12 @@ onc = add_pressure_axis(onc, plevs)
 # Interpolate to pressure levels 3D variables
 #
 for var in interpvars:
+	if opt.verbose: print "Interpolating %s to pressure levels" % var
 	onc = interp2plevs(var, inc, onc, bf, plevs)
-onc.close()
+#
+# Compute diagnostics
+#
+for var in diags:
+	if opt.verbose: print "Computing diagnostic %s" % var
+	onc = compute_diagnostic(var, inc, onc, bf, plevs)
 print "SUCCESS: p_interp finished without errors"

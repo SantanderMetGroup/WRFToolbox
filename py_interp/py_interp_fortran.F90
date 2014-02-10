@@ -251,6 +251,87 @@ SUBROUTINE int1D(xxout, xxin, ppin, ppout, npin, npout, LINLOG, MISSING)
 
 END SUBROUTINE int1D
 !------------------------------------------------------------------------------
+SUBROUTINE compute_mslp(data_out, pres_field, psfc, ter, tk, qv, ix, iy, iz, it)
+! New subroutine to compute mean_sealevel pressure values 
+
+    INTEGER, INTENT(IN)                                           :: ix, iy, iz, it
+    REAL(8), DIMENSION(ix, iy, it), INTENT(OUT)                   :: data_out
+    REAL(8), DIMENSION(ix, iy, iz, it), INTENT(IN)                :: pres_field, tk, qv
+    REAL(8), DIMENSION(ix, iy, it), INTENT(IN)                    :: psfc
+    REAL(8), DIMENSION(ix, iy), INTENT(IN)                        :: ter
+    INTEGER                                                       :: i, j, itt, kin, kupper
+    REAL(8)                                                       :: ptarget, dpmin, dp, tkint, tbotextrap
+    REAL(8)                                                       :: tvbotextrap, pbot, expon
+
+!    N = 1.0
+    expon = 287.04*.0065/9.81
+
+!    data_out = 0.
+!    We are below both the ground and the lowest data level.
+
+!    First, find the model level that is closest to a "target" pressure
+!    level, where the "target" pressure is delta-p less that the local
+!    value of a horizontally smoothed surface pressure field.  We use
+!    delta-p = 150 hPa here. A standard lapse rate temperature profile
+!    passing through the temperature at this model level will be used
+!    to define the temperature profile below ground.  This is similar
+!    to the Benjamin and Miller (1990) method, using  
+!    700 hPa everywhere for the "target" pressure.
+    do itt = 1, it
+        do j = 1, iy
+            do i = 1, ix
+                ptarget = (psfc(i,j,itt)*.01) - 150.
+                dpmin = 1.e4
+                kupper = 0
+                loop_kIN : do kin = iz,1,-1
+                kupper = kin
+                dp=abs( (pres_field(i, j, kin, itt)*.01) - ptarget )
+                if (dp.gt.dpmin) exit loop_kIN
+                dpmin=min(dpmin, dp)
+            enddo loop_kIN
+            ptarget=ptarget*100.
+            !          
+            if (pres_field(i, j, kupper + 1, itt) - ptarget .ge. 0) then
+                kupper = kupper + 1
+            endif
+
+!           kupper = 8
+!           ptarget = pres_field(i, j, kupper, itt)
+!
+!           García-Díez 2012-06
+!           The reference level temperature is computed by
+!           linear interpolation, so there is no jump when the selected eta level changes.
+!
+            tkint = (tk(i, j, kupper, itt)*abs(ptarget - pres_field(i, j, kupper, itt)) + &
+            tk(i, j, kupper + 1, itt)*abs(ptarget - pres_field(i, j, kupper + & 
+            1, itt)))/abs(pres_field(i, j, kupper, itt) - pres_field(i, j, kupper + 1, itt))
+!           tkint = tk(i, j, kupper, itt)
+
+            pbot = pres_field(i,j,1,itt)
+            
+            !         tbotextrap = tkint*(psfc(i, j, itt)/ptarget)**expon
+            tkint = tk(i, j, kupper, itt)
+            tbotextrap = tkint*(pbot/ptarget)**expon
+            tvbotextrap = virtual(tbotextrap, qv(i,j,1,itt))
+            data_out(i, j, itt) = pbot*((tvbotextrap + 0.0065*ter(i, j))/tvbotextrap)**(1/expon)
+
+!         IF (i==INT(ix/2) .AND. j==INT(iy/2) ) THEN
+!         IF (i==54 .AND. j==134) THEN
+!           IF (ter(i,j) > 2300.) THEN
+!             PRINT *, 'pkupper - 1:', pres_field(i,j,kupper - 1,itt), 'pkupper:', pres_field(i,j,kupper,itt), 'pkupper + 1:', pres_field(i,j,kupper + 1,itt), 'pkupper + 2:', pres_field(i,j,kupper + 2,itt)
+!             PRINT *, 'tk kupper:', tk(i,j,kupper,itt), 'tk kupper + 1:', tk(i,j,kupper + 1,itt), 'tkint:', tkint
+!             PRINT *, 'qv kupper:', qv(i,j,kupper,itt), 'qv kupper + 1:', qv(i,j,kupper + 1,itt), 'qvint:', qvint
+!             PRINT *,itt,' ptarget',ptarget,'kupper:',kupper
+!             PRINT *,'tk:',tk(i,j,kupper,itt),'psfc:',psfc(i,j,itt)
+!             PRINT *,'tbot:',tbotextrap,'tvbot:',tvbotextrap,'ter:',ter(i,j)
+!             PRINT *,'qv:',qv(i,j,kupper,itt),'mslp:',data_out(i,j,itt,1)
+!           ENDIF
+            enddo ! i
+        enddo ! j
+    enddo ! itt
+
+END SUBROUTINE compute_mslp
+!------------------------------------------------------------------------------
 FUNCTION virtual (tmp,rmix)
     IMPLICIT NONE
 !      This function returns virtual temperature in K, given temperature

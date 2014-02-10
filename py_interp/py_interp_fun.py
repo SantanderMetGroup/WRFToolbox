@@ -129,6 +129,19 @@ def interp2plevs(ivar, inc, onc, bf, plevs):
 			continue
 		ovarobj.setncattr(attrname, attrvalue)
 	return onc
+	
+def compute_diagnostic(ivar, inc, onc, bf, plevs):
+	if ivar == "MSLP":
+		ovardata = f90.compute_mslp(tr(bf.pres_field), tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor))
+		ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+		ovarobj[:] = tr(ovardata)
+		ovarobj.FieldType  =104
+		ovarobj.MemoryOrder = "Z"
+		ovarobj.description = "Pressure levels"
+		ovarobj.units = "pa"
+		ovarobj.stagger = "-"
+		ovarobj.coordinates = "XLONG XLAT"
+	return onc
 
 class BasicFields:
 	def __init__(self, inc):
