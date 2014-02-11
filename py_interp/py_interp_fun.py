@@ -28,7 +28,6 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
         for ikey, ivalue in inc.__dict__.iteritems():
             onc.setncattr(ikey, ivalue)
             onc.history = "Created by %s on %s" % (sys.argv[0],time.ctime(time.time()))
-            onc.sync()
     #
     # Copy dimensions
     #
@@ -49,23 +48,20 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
                 onc.createDimension(dimname, len(dimobj) - boundary_points*2)
             else:
                 onc.createDimension(dimname, len(dimobj))
-    onc.sync()
     #
     # Copy variables specified in the argument
     #
-    for ivarname, ivarobj in inc.variables.iteritems():
-        if not ivarname in variables:
-            continue
+    for ivarname in variables:
+        ivarobj = inc.variables[ivarname]
+        ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions)
+        for attrname, attrvalue in ivarobj.__dict__.iteritems():
+            ovarobj.setncattr(attrname, attrvalue)
+        if del_boundaries and ((xydims[0] in ovarobj.dimensions) or (xydims[1] in ovarobj.dimensions)):
+            oarray = delete_boundaries(ivarobj[:], boundary_points)
         else:
-            ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions)
-            for attrname, attrvalue in ivarobj.__dict__.iteritems():
-                ovarobj.setncattr(attrname, attrvalue)
-            if del_boundaries and ((xydims[0] in ovarobj.dimensions) or (xydims[1] in ovarobj.dimensions)):
-                oarray = delete_boundaries(ivarobj[:], boundary_points)
-            else:
-                oarray = ivarobj[:]
-            ovarobj[:] = oarray[:]
-            onc.sync()
+            oarray = ivarobj[:]
+        ovarobj[:] = oarray[:]
+    onc.sync()
     return onc
 
 def copy_n_filter_wrfout(inc, ofile, copyvars):
@@ -131,17 +127,72 @@ def interp2plevs(ivar, inc, onc, bf, plevs):
 	return onc
 	
 def compute_diagnostic(ivar, inc, onc, bf, plevs):
-	if ivar == "MSLP":
-		ovardata = f90.compute_mslp(tr(bf.pres_field), tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor))
-		ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
-		ovarobj[:] = tr(ovardata)
-		ovarobj.FieldType  =104
-		ovarobj.MemoryOrder = "Z"
-		ovarobj.description = "Pressure levels"
-		ovarobj.units = "pa"
-		ovarobj.stagger = "-"
-		ovarobj.coordinates = "XLONG XLAT"
-	return onc
+    if ivar == "MSLP":
+        ovardata = f90.compute_mslp(tr(bf.pres_field), tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor))
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj[:] = tr(ovardata)
+        ovarobj.FieldType  = 104
+        ovarobj.MemoryOrder = "Z"
+        ovarobj.description = "Pressure levels"
+        ovarobj.units = "pa"
+        ovarobj.stagger = "-"
+        ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "CLT_OLD":
+        cldfra = inc.variables["CLDFRA"][:]
+        ovardata = f90.clt_sundqvist(tr(cldfra))
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj[:] =  tr(ovardata)
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XY"
+        ovarobj.description = "total cloud fraction Sundqvist"
+        ovarobj.units = "1"
+        ovarobj.stagger = ""
+        ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "CLT":
+        cldfra = inc.variables["CLDFRA"][:]
+        ovardata = f90.clt_maxrand(tr(cldfra))
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj[:] =  tr(ovardata)
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XY"
+        ovarobj.description = "total cloud fraction"
+        ovarobj.units = "1"
+        ovarobj.stagger = ""
+        ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "CLL":
+        cldfra = inc.variables["CLDFRA"][:]
+        ovardata = f90.clt_maxrand_levels(tr(cldfra), tr(bf.pres_field), maxpres=1000, minpres=680)
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj[:] =  tr(ovardata)
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XY"
+        ovarobj.description = "Low cloud fraction (1000-680 hPa)"
+        ovarobj.units = "1"
+        ovarobj.stagger = ""
+        ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "CLM":
+        cldfra = inc.variables["CLDFRA"][:]
+        ovardata = f90.clt_maxrand_levels(tr(cldfra), tr(bf.pres_field), maxpres=680, minpres=440)
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj[:] =  tr(ovardata)
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XY"
+        ovarobj.description = "Medium cloud fraction (680-400 hPa)"
+        ovarobj.units = "1"
+        ovarobj.stagger = ""
+        ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "CLH":
+        cldfra = inc.variables["CLDFRA"][:]
+        ovardata = f90.clt_maxrand_levels(tr(cldfra), tr(bf.pres_field), maxpres=440, minpres=10)
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj[:] =  tr(ovardata)
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XY"
+        ovarobj.description = "High cloud fraction (440-10 hPa)"
+        ovarobj.units = "1"
+        ovarobj.stagger = ""
+        ovarobj.coordinates = "XLONG XLAT"   
+    return onc
 
 class BasicFields:
 	def __init__(self, inc):

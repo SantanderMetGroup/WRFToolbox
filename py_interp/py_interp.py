@@ -41,7 +41,7 @@ inc = ncdf.Dataset(ifile, "r")
 # Get copyvars, variables that don't need interpolation and can be directly copied.
 #
 dims2D=("Time", "south_north", "west_east")
-diagnostics = ["MSLP"]
+diagnostics = ["MSLP", "CLT", "CLT_OLD", "CLH", "CLM", "CLL"]
 #
 # TODO: Diagnostics: CLT, CLL, vertical sums, sea level pressure, etc
 #
@@ -96,4 +96,5 @@ for var in interpvars:
 for var in diags:
 	if opt.verbose: print "Computing diagnostic %s" % var
 	onc = compute_diagnostic(var, inc, onc, bf, plevs)
+onc.sync()
 print "SUCCESS: p_interp finished without errors"

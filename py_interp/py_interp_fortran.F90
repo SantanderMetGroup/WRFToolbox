@@ -331,6 +331,215 @@ SUBROUTINE compute_mslp(data_out, pres_field, psfc, ter, tk, qv, ix, iy, iz, it)
     enddo ! itt
 
 END SUBROUTINE compute_mslp
+
+!---------------------------------------------------------------------
+
+SUBROUTINE clt_sundqvist(dx, dy, dz, dt, cldfra, totcloudfr)
+!  Subroutine to compute total cloud cover in base 1. BY LLUIS
+
+    IMPLICIT NONE
+    INTEGER,INTENT(IN)                                     :: dx, dy, dz, dt
+    REAL(8), DIMENSION(dx,dy,dz,dt), INTENT(IN)           :: cldfra
+    REAL(8), DIMENSION(dx,dy,dt),    INTENT(OUT)          :: totcloudfr
+    ! Local
+    INTEGER                                                 :: k
+    REAL(8), DIMENSION(dx,dy,dz,dt)                        :: cldfram1, cldmax
+
+    !!!!!!!!!!!!!! Variables
+    ! dx, dy, dz, dt: dimensions of fields
+    ! cldfra: cloud fraction at each level
+    ! totcfr: total cloud fraction
+    !
+    ! rcode = nf_inq_varid(ncid, cldfraname, idcldfra)
+    ! rcode = nf_get_var_real(ncid, idcldfra, cldfra)
+
+    totcloudfr = 1.
+    cldfram1(:,:,2:dz,:) = cldfra(:,:,1:dz-1,:)
+    cldfram1(:,:,1,:) = 0.
+    cldmax = MAX(cldfram1,cldfra)
+
+    WHERE (cldfram1 == 1.) cldfram1 = 0.99
+
+    vertical_levels: DO k=1, dz 
+        totcloudfr=totcloudfr*((1. - cldmax(:,:,k,:))/(1. - cldfram1(:,:,k,:)))
+!        PRINT *, "totcloudfr(dx/, dy/2, 2):", totcloudfr(50, 50, 2)
+!        PRINT *, "cldfram1(dx/, dy/2, 2):", cldfram1(50,50,k,2)
+!        PRINT *, "cldmax(dx/, dy/2, 2):", cldmax(50,50,k,2)
+    END DO vertical_levels
+    totcloudfr = 1. - totcloudfr
+
+END SUBROUTINE clt_sundqvist
+
+!---------------------------------------------------------------------
+
+SUBROUTINE clt_maxrand(tot_cldfra, cldfra, ix, iy, iz, it)
+!
+!  Subroutine to compute total cloud cover in base 1 using maximum-random overlapping
+!
+    IMPLICIT NONE
+    INTEGER,INTENT(IN)                                     :: ix, iy, iz, it
+    REAL(8), DIMENSION(ix,iy,iz,it), INTENT(IN)           :: cldfra
+    REAL(8), DIMENSION(ix,iy,it),    INTENT(OUT)          :: tot_cldfra
+    ! Local
+    REAL(8)                                                 :: tot_col_cldfra
+    INTEGER                                                 :: i, j, t
+    !
+    ! ix, iy, iz, it: dimensions of fields
+    ! cldfra: cloud fraction at each model level
+    ! tot_cldfra: total cloud fraction (ix, iy, it) array
+    ! tot_col_cldfra: column total cloud fraction real
+    ! minpres, maxpres, optional bounds for pressure levels in hPa
+    ! pres_field, optional pressure field
+    !
+    do t = 1, it
+        do j = 1, iy
+            do i = 1, ix
+                call clt_maxrand_column(tot_col_cldfra, cldfra(i,j,:,t), iz)
+                tot_cldfra(i,j,t) = tot_col_cldfra
+            end do ! i
+        end do ! j
+    end do ! t
+    
+END SUBROUTINE clt_maxrand
+
+!---------------------------------------------------------------------
+
+SUBROUTINE clt_maxrand_levels(tot_cldfra, cldfra, pres_field, maxpres, minpres, ix, iy, iz, it)
+!
+! Subroutine to compute total cloud cover in base 1 using maximum-random overlapping.
+! This one is able to compute high, low and medium clouds. Its sepparated from the total
+! because optional arguments are not working and then it is not efficient.
+!
+    IMPLICIT NONE
+    INTEGER,INTENT(IN)                                     :: ix, iy, iz, it
+    REAL(8), DIMENSION(ix,iy,iz,it), INTENT(IN)           :: cldfra
+    REAL(8), DIMENSION(ix,iy,iz,it), INTENT(IN)           :: pres_field
+    REAL(8), INTENT(IN)                                    :: minpres, maxpres
+    REAL(8), DIMENSION(ix,iy,it),    INTENT(OUT)          :: tot_cldfra
+    ! Local
+    REAL(8), DIMENSION(ix,iy,iz,it)                        :: masked_cldfra
+    REAL(8)                                                 :: tot_col_cldfra
+    INTEGER                                                 :: i, j, t
+    !
+    ! ix, iy, iz, it: dimensions of fields
+    ! cldfra: cloud fraction at each model level
+    ! tot_cldfra: total cloud fraction (ix, iy, it) array
+    ! tot_col_cldfra: column total cloud fraction real
+    ! minpres, maxpres, bounds for pressure levels in hPa
+    ! pres_field, pressure field
+    !
+    masked_cldfra = cldfra
+    where (pres_field <= minpres*100.) masked_cldfra(:,:,:,:) = 0.
+    where (pres_field >= maxpres*100.) masked_cldfra(:,:,:,:) = 0.
+
+    do t = 1, it
+        do j = 1, iy
+            do i = 1, ix
+                call clt_maxrand_column(tot_col_cldfra, masked_cldfra(i,j,:,t), iz)
+                tot_cldfra(i,j,t) = tot_col_cldfra
+            end do ! i
+        end do ! j
+    end do ! t
+    
+END SUBROUTINE clt_maxrand_levels
+
+!---------------------------------------------------------------------
+
+SUBROUTINE clt_maxrand_column(tot_col_cldfra, col_cldfra, iz)
+!
+! Subroutine for performing maximum-random overlapping in one column.
+!
+    INTEGER,INTENT(IN)                                     :: iz
+    REAL(8), DIMENSION(iz), INTENT(IN)                    :: col_cldfra
+    REAL(8), INTENT(OUT)                                   :: tot_col_cldfra
+    INTEGER                                                 :: k, nseq
+    REAL(8),  ALLOCATABLE, DIMENSION(:)                  :: seq_cldfra
+    LOGICAL                                                 :: in_cloudy_section
+    !
+    ! iz (in): Number of vertical levels.
+    ! col_cldfra (in): Cloud fraction in model levels.
+    ! tot_col_cldfra (out) : Column total cloud fraction real
+    ! k: Vertical level counter
+    ! nseq: Cloudy section number (levels with cldfra > 1 sepparated by cloud free levels)
+    ! seq_cldfra: Allocatable array to store each sections cloud fraction
+    ! in_cloudy_section: Flag that tells us if we are inside a cloudy section or not.
+    !
+    ! First, we need to find the number of cloudy sections.
+    !
+    nseq = 0
+    in_cloudy_section = .FALSE.
+    do k = 1, iz
+        if (col_cldfra(k) > 0.) then
+            !
+            ! Check if we are already in a cloudy section
+            !
+            if (in_cloudy_section) then
+                !
+                ! We are inside a section, don't count it
+                !
+                cycle
+            else
+                !
+                ! We found a new cloudy section
+                !
+                in_cloudy_section = .TRUE.
+                nseq = nseq + 1
+            endif
+        else
+            !
+            ! We are outside a cloudy section.
+            !
+            in_cloudy_section = .FALSE.
+        endif
+    end do ! k
+    !debug
+    !print *, "Number of cloudy sections found:", nseq
+    !
+    ! Allocate the vector with cloud fractions of each section
+    !
+    allocate(seq_cldfra(nseq))
+    !
+    ! Then loop again over the vertical axis storing the cloud fraction
+    ! of each section, computed assuming maximum overlapping.
+    !
+    nseq = 0
+    in_cloudy_section = .FALSE.
+    do k = 1, iz
+        !
+        ! Check if we are already in a cloudy section
+        !
+        if (col_cldfra(k) > 0.) then
+            if (in_cloudy_section) then
+                !
+                ! We are inside a section, check if this level cltfra is
+                ! larger than previous and store it.
+                !
+                seq_cldfra(nseq) = max(seq_cldfra(nseq), col_cldfra(k))
+            else
+                !
+                ! We found a new cloudy section. Move the counter and 
+                ! save its cldfra.
+                !
+                in_cloudy_section = .TRUE.
+                nseq = nseq + 1
+                seq_cldfra(nseq) = col_cldfra(k)
+            endif
+        else
+            !
+            ! We are outside a cloudy section.
+            !
+            in_cloudy_section = .FALSE.
+        endif
+    end do ! k
+
+    !print *, "Cloud section cldfra:", seq_cldfra
+    !print *, "All levels cloud fraction:" , col_cldfra
+    !
+    ! Compute the total cloud cover assuming random overlapping
+    ! between cloudy sections.
+    !
+    tot_col_cldfra = 1. - product(1. - seq_cldfra)
+END SUBROUTINE clt_maxrand_column
 !------------------------------------------------------------------------------
 FUNCTION virtual (tmp,rmix)
     IMPLICIT NONE
