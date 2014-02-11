@@ -1,6 +1,10 @@
+########################################################################
 #
 # py_interp alpha by Markel Garcia Diez February 2014
 #
+# See the README for info and/or type python py_interp.py -h for help.
+#
+########################################################################
 import numpy as np
 import netCDF4 as ncdf
 import os, sys
@@ -38,31 +42,30 @@ if not os.path.exists(ifile):
 print "Reading file %s" % ifile
 inc = ncdf.Dataset(ifile, "r")
 #
-# Get copyvars, variables that don't need interpolation and can be directly copied.
+# Separate the input variables in three lists: 2D variables (or soil variables)
+# to copy, 3D variables to interpolate and diagnostics that need specific
+# functions to be computed.
 #
 dims2D=("Time", "south_north", "west_east")
 diagnostics = ["MSLP", "CLT", "CLT_OLD", "CLH", "CLM", "CLL"]
-#
-# TODO: Diagnostics: CLT, CLL, vertical sums, sea level pressure, etc
-#
 copyvars = []
 interpvars = []
 diags = []
-for v in varlist:
-	if v in diagnostics:
-		diags.append(v)
-	else:
-		vdims = inc.variables[v].dimensions
-		if vdims == dims2D:
-			copyvars.append(v)
-		elif ("bottom_top" in vdims) or ("bottom_top_stag" in vdims):
-			interpvars.append(v)
-		else:
-			print "Error: Variable %s not found in file, and is not a diagnostic" % var
-			print "Available diagnostics: None!"
-			sys.exit(1)
+for var in varlist:
+    if var in diagnostics:
+        diags.append(var)
+    else:
+        if var not in inc.variables.keys():
+            print "Error: Variable %s not found in file, and is not a diagnostic" % var
+            sys.exit(1)
+        vdims = inc.variables[var].dimensions
+        if ("bottom_top" in vdims) or ("bottom_top_stag" in vdims):
+            interpvars.append(var)
+        else:
+            copyvars.append(var)
+
 if opt.verbose:
-	print "2D variables %s" % copyvars
+	print "Variables to copy %s" % copyvars
 	print "3D variables to interpolate %s" % interpvars
 	print "Diagnostics to compute %s" % diags
 #

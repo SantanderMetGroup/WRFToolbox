@@ -65,9 +65,19 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
     return onc
 
 def copy_n_filter_wrfout(inc, ofile, copyvars):
-	onc = copy_netcdf_structure(inc, ofile, variables=copyvars,
-		dimensions=["Time", "south_north", "west_east", "DateStrLen"], isncobj = True, xydims = ["west_east", "south_north"])
-	return onc
+    #
+    # Check if we need the soil layers dimension
+    #
+    if ("TSLB" in copyvars) or (("SMOIS" in copyvars) or ("SH2O" in copyvars)):
+        dims = ["Time", "south_north", "west_east", "DateStrLen", "soil_layers_stag"]
+    else:
+        dims = ["Time", "south_north", "west_east", "DateStrLen"]
+    #
+    # Copy the input wrfout
+    #
+    onc = copy_netcdf_structure(inc, ofile, variables=copyvars,
+        dimensions=dims, isncobj = True, xydims = ["west_east", "south_north"])
+    return onc
 
 def add_pressure_axis(onc, plevs):
 	onc.createDimension("num_metgrid_levels", len(plevs))
