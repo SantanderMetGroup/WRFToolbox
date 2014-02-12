@@ -111,7 +111,6 @@ def de_stagger(ivarobj, ivardata):
 def interp2plevs(ivar, inc, onc, bf, plevs):
 	ivarobj = inc.variables[ivar]
 	ivardata = ivarobj[:]
-	is_ght = ivar == "GHT"
 	#
 	# Check if the variable is staggered and de-stagger it if necessary
 	#
@@ -123,7 +122,7 @@ def interp2plevs(ivar, inc, onc, bf, plevs):
 	#
 	print "Calling interpolation routine"
 	ovardata = f90.interp(tr(ivardata), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
-						linlog=1, extrapolate=1, geopt=is_ght, missing=1.e36)
+						linlog=1, extrapolate=1, geopt=False, missing=1.e36)
 	#
 	# Create the output variable and add data and attributes
 	#
@@ -147,6 +146,55 @@ def compute_diagnostic(ivar, inc, onc, bf, plevs):
         ovarobj.units = "pa"
         ovarobj.stagger = "-"
         ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "GHT":
+        ovardata = f90.interp(tr(bf.ght), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
+						linlog=1, extrapolate=1, geopt=True, missing=1.e36)
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"])
+        ovarobj[:] = tr(ovardata)
+        ovarobj.FieldType  = 104
+        ovarobj.MemoryOrder = "XZY"
+        ovarobj.description = "Geopotential Height"
+        ovarobj.units = "m"
+        ovarobj.stagger = "-"
+        ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "PRES":
+        nj, ni = bf.pres_field.shape[2], bf.pres_field.shape[3]
+        nplev = len(plevs)
+        nt = bf.pres_field.shape[0]
+        ovardata = np.repeat(np.nan, nt*nplev*nj*ni).reshape(nt, nplev, nj, ni)
+        for n in xrange(nplev):
+            ovardata[:, n, :, :] = plevs[n]
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"])  
+        ovarobj[:] = ovardata        
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XZY"
+        ovarobj.description = "Pressure"
+        ovarobj.units = "Pa"
+        ovarobj.stagger = "-"
+        ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "TT":
+        ovardata = f90.interp(tr(bf.temp), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
+                linlog=1, extrapolate=1, geopt=False, missing=1.e36)
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"])
+        ovarobj[:] = tr(ovardata)
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XZY"
+        ovarobj.description = "Temperature"
+        ovarobj.units = "K"
+        ovarobj.stagger = "-"
+        ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "RH":
+        ovardata = f90.interp(tr(bf.rh), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
+                linlog=1, extrapolate=1, geopt=False, missing=1.e36)
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"])  
+        ovarobj[:] = tr(ovardata)
+        ovarobj.FieldType = 104 ;
+        ovarobj.MemoryOrder = "XZY" ;
+        ovarobj.description = "Relative Humidity" ;
+        ovarobj.units = "%" ;
+        ovarobj.stagger = "-" ;
+        ovarobj.coordinates = "XLONG XLAT" ;
+        
     elif ivar == "CLT_OLD":
         cldfra = inc.variables["CLDFRA"][:]
         ovardata = f90.clt_sundqvist(tr(cldfra))
@@ -203,54 +251,57 @@ def compute_diagnostic(ivar, inc, onc, bf, plevs):
         ovarobj.stagger = ""
         ovarobj.coordinates = "XLONG XLAT"   
     return onc
-
+    
 class BasicFields:
-	def __init__(self, inc):
-		#
-		# Basic constants
-		#
-		self.Rd = 287.04   # Gas constant for the air (J K-1 Kg-1)
-		self.Cp = 7.*self.Rd/2. #  Specific heat (J Kg-1)
-		self.RCP = self.Rd/self.Cp
-		self.P0 = 100000 # Base pressure for the Poisson equation in Pa
-		print "Reading basic fields..."
-		self.get_sfc_pressure(inc)
-		self.get_terrain_height(inc)
-		self.get_pressure(inc)
-		self.get_geopotential(inc)
-		self.get_temperature(inc)
-		self.get_qvapor(inc)
-	#
-	# Methods for reading basic fields
-	#
-	def get_sfc_pressure(self, inc):
-		# in Pa
-		self.psfc = inc.variables["PSFC"][:]
-	
-	def get_terrain_height(self, inc):
-		# in m
-		self.hgt = inc.variables["HGT"][0, :, :]
-	
-	def get_pressure(self, inc):
-		# in Pa
-		base_pres = inc.variables["PB"][:]
-		perturbation_pres =  inc.variables["P"][:]
-		self.pres_field = base_pres + perturbation_pres
-
-	def get_geopotential(self, inc):
-		# in m2s-2
-		base_ght = inc.variables["PHB"][:]
-		perturbation_ght =  inc.variables["PH"][:]
-		ght = base_ght + base_ght
-		# de-stagger
-		self.ght = (ght[:, 0:-1, :, :] + ght[:, 1:, :, :])/2
-
-	def get_temperature(self, inc):
-		 # in k
-		 base_pot_temp = 300 # not T0 which is other thing!!
-		 perturbation_pot_temp = inc.variables["T"][:]
-		 pot_temp = base_pot_temp + perturbation_pot_temp
-		 self.temp = pot_temp*(self.pres_field/self.P0)**self.RCP
-	def get_qvapor(self, inc):
-		 # in k
-		 self.qvapor = inc.variables["QVAPOR"][:]
+    def __init__(self, inc):
+        #
+        # Basic constants
+        #
+        self.Rd = 287.04   # Gas constant for the air (J K-1 Kg-1)
+        self.Cp = 7.*self.Rd/2. #  Specific heat (J Kg-1)
+        self.RCP = self.Rd/self.Cp
+        self.P0 = 100000 # Base pressure for the Poisson equation in Pa
+        print "Reading basic fields..."
+        self.get_sfc_pressure(inc)
+        self.get_terrain_height(inc)
+        self.get_pressure(inc)
+        self.get_geopotential(inc)
+        self.get_temperature(inc)
+        self.get_qvapor(inc)
+        self.get_relative_humidity(inc)
+    #
+    # Methods for reading basic fields
+    #
+    def get_sfc_pressure(self, inc):
+        # in Pa
+        self.psfc = inc.variables["PSFC"][:]
+    def get_terrain_height(self, inc):
+        # in m
+        self.hgt = inc.variables["HGT"][0, :, :]
+    def get_pressure(self, inc):
+        # in Pa
+        base_pres = inc.variables["PB"][:]
+        perturbation_pres =  inc.variables["P"][:]
+        self.pres_field = base_pres + perturbation_pres
+    def get_geopotential(self, inc):
+        # in m2s-2
+        base_ght = inc.variables["PHB"][:]
+        perturbation_ght =  inc.variables["PH"][:]
+        ght = base_ght + base_ght
+        # de-stagger
+        self.ght = (ght[:, 0:-1, :, :] + ght[:, 1:, :, :])/2
+    def get_temperature(self, inc):
+        # in k
+        base_pot_temp = 300 # not T0 which is other thing!!
+        perturbation_pot_temp = inc.variables["T"][:]
+        pot_temp = base_pot_temp + perturbation_pot_temp
+        self.temp = pot_temp*(self.pres_field/self.P0)**self.RCP
+    def get_qvapor(self, inc):
+        # in k
+        self.qvapor = inc.variables["QVAPOR"][:]
+    def get_relative_humidity(self, inc):
+        # in 100/1
+        data1 = 10.*0.6112*np.exp(17.67*(self.temp - 273.16)/(self.temp - 29.65))
+        data2 = 0.622*data1/(0.01 * self.pres_field -  (1.-0.622)*data1)
+        self.rh = 100.*self.qvapor/data2
+        self.rh = np.where(self.rh > 100., 100., self.rh) 

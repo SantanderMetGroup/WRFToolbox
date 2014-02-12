@@ -47,7 +47,7 @@ inc = ncdf.Dataset(ifile, "r")
 # functions to be computed.
 #
 dims2D=("Time", "south_north", "west_east")
-diagnostics = ["MSLP", "CLT", "CLT_OLD", "CLH", "CLM", "CLL"]
+diagnostics = ["MSLP", "CLT", "CLT_OLD", "CLH", "CLM", "CLL", "GHT", "PRES", "RH", "TT"]
 copyvars = []
 interpvars = []
 diags = []
