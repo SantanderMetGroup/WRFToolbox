@@ -1,0 +1,177 @@
+#! /bin/bash
+use cdo
+use netcdf
+
+function usage(){
+  cat << End_of_help
+    Usage: swpp_averager [options]
+
+    --input, i
+      Input files and (optionally) maximum number of files to process.
+      This flag can appear as many times as necessary to include all
+      the files to be processed:
+
+      -i '/path/to/files/filename_??????_var.nc':24
+      
+      Path expansion by the shell must be protected by using single
+      quotes: '
+
+    --dry-run, -n
+      Just show the files that would be processed and exit
+
+    --help, -h
+      Print this help message
+
+    --cdo-flags, -l
+      Use it to set some flags for the last call of CDO in the script. Useful for the output formatting (use "-z zip" to set 
+      deflate compression)
+End_of_help
+}
+
+#####################################################################
+#
+#  Option parser
+#
+#  Try to get the configuration from the environment and the command
+#  line.
+#
+#####################################################################
+periods=${SWPP_PERIODS}
+outpattern=${SWPP_OUTPUT_PATTERN}
+tmpdirbase=${SWPP_TEMPORARY_STORAGE}
+cdooperator=${SWPP_CDO_OPERATION}
+
+inputfiles=""
+is_dry=0
+while test -n "$1"; do
+  case "$1" in
+    --periods|-p) periods=$2; shift ;;
+    --outpattern|-o) outpattern=$2; shift ;;
+    --temporary-storage|-t) tmpdirbase=$2; shift ;;
+    --input|-i) inputfiles="${inputfiles},$2"; shift ;;
+    --input-from-file|-f)
+        if test -f "$2"; then
+          for line in $(cat $2); do
+            inputfiles="${inputfiles},${line}"
+          done
+        else
+          echo "$2: file does not exist!"
+          exit
+        fi
+        shift ;;
+    --cdo-operation|-c) cdooperator="$2"; shift ;;
+    --rename-var|-r) chname="$2"; shift ;;
+    --dry-run|-n) is_dry=1 ;;
+    --cdo-flags|-l) cdo_flags="$2"; shift ;;
+    --help|-h) usage; exit ;;
+    *) echo "Unknown option: $1"; exit ;;
+  esac
+  shift
+done
+#####################################################################
+#
+#  Functions
+#
+#####################################################################
+
+function print_config(){
+  # Prints the configuration options taken from the environment
+  # or command line
+  cat << End_of_conf
+  SWPP_OUTPUT_PATTERN (--outpattern)
+    ${outpattern}
+  SWPP_TEMPORARY_STORAGE (--temporary-storage)
+    ${tmpdirbase}
+  SWPP_PERIODS (--periods)
+    ${periods}
+  --input
+    ${inputfiles} 
+  --rename-var
+    ${chname} 
+End_of_conf
+}
+
+function get_filelist_year() {
+  # Assumes yearmon in filename!
+  year=$1
+  grep "_${year}[01][0-9]_" cache.filelist | sort
+}
+
+#####################################################################
+#
+#  Main program
+#
+#####################################################################
+
+scriptdir=$( (cd `dirname $0` && echo $PWD) )
+thisdir=$(pwd)
+#
+#  Get a private space to run
+#
+if test -n "${tmpdirbase}"; then
+  tmpdir=${tmpdirbase}/tmpdir.`date +%Y%m%d%H%M%S%n`
+else
+  tmpdir=${thisdir}/tmpdir.`date +%Y%m%d%H%M%S%n`
+fi
+mkdir -p ${tmpdir} && cd ${tmpdir} || exit
+
+print_config
+#
+#   Get file list
+#
+rm -f cache.filelist
+for ifiles_skipfiles_maxfiles in ${inputfiles//,/ }; do
+  read ifiles skipfiles maxfiles <<< ${ifiles_skipfiles_maxfiles//:/ }
+  if test -n "${skipfiles}"; then
+    eval \ls ${ifiles} | awk 'NR>'${skipfiles}' ' | head -n ${maxfiles} >> cache.filelist
+  else
+    eval \ls ${ifiles} >> cache.filelist
+  fi
+done
+
+if test ${is_dry} -eq 1; then
+  echo "Files to process:"
+  cat cache.filelist
+  exit
+fi
+if test -n "${chname}"; then
+  cdooperator="${cdooperator} -chname,${chname}"
+fi
+#
+#   Main loop
+#
+for period in ${periods//,/ }; do
+  read iyear fyear <<< ${period//-/ }
+  outfile=$(eval echo $outpattern) # expand the pattern
+  tmpoutfile=${tmpdir}/$(basename ${outfile})
+  if test -e ${outfile}; then
+    echo "${outfile} already exists! I won't overwrite it!"
+    continue
+  fi
+  if test -e "${outfile}.gz"; then
+    echo "A gzipped version of ${outfile} already exists!"
+    echo "I won't create it again!"
+    continue
+  fi
+  mkdir -p $(dirname ${outfile})
+  for year in $(seq ${iyear} ${fyear}); do
+    flist=$(get_filelist_year $year)
+    if test -n "${flist}"; then
+      cdo cat $(get_filelist_year $year) s1.temp
+      nccopy -k 1 s1.temp s1
+      rm s1.temp
+    else
+      echo "Error: No files available for year ${year}"
+      continue
+    fi
+    if test -n "${cdooperator}"; then
+      cdo ${cdooperator} s1 swppdata_${year}
+      rm -f s1
+    else
+      mv s1 swppdata_${year}
+    fi
+  done # year
+  cdo ${cdo_flags} cat swppdata_???? ${tmpoutfile}
+  mv ${tmpoutfile} ${outfile}
+  rm -f swppdata_???? s1
+done # period
