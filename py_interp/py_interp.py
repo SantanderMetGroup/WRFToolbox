@@ -8,7 +8,8 @@
 import numpy as np
 import netCDF4 as ncdf
 import os, sys
-from py_interp_fun import copy_n_filter_wrfout, BasicFields, add_pressure_axis, interp2plevs, compute_diagnostic
+import py_interp_diags
+from py_interp_fun import copy_n_filter_wrfout, BasicFields, add_pressure_axis, interp2plevs
 from optparse import OptionParser
 #
 # Parse options
@@ -97,7 +98,11 @@ for var in interpvars:
 # Compute diagnostics
 #
 for var in diags:
-	if opt.verbose: print "Computing diagnostic %s" % var
-	onc = compute_diagnostic(var, inc, onc, bf, plevs)
+    if opt.verbose: print "Computing diagnostic %s" % var
+    #
+    # Use getattr to get the function from py_interp_diags.py and then call it
+    #
+    compute_diag = getattr(py_interp_diags, "compute_%s" % var)
+    onc = compute_diag(var, inc, onc, bf, plevs)
 onc.sync()
 print "SUCCESS: p_interp finished without errors"
