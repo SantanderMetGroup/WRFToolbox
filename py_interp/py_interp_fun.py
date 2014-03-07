@@ -134,6 +134,28 @@ def interp2plevs(ivar, inc, onc, bf, plevs):
 			continue
 		ovarobj.setncattr(attrname, attrvalue)
 	return onc
+#
+# Function to compute mass-weighted vertical integrals: Input, an array and a netcdf object.
+# As WRF uses an hybrid sigma vertical coordinate, the distance between levels 
+# ,measured in the eta coordinate, is proportional to the mass differential:
+# dm = -(colmass/g)*deta Where colmass is the total
+# weight of the air columns and g 9.8 m2s-2
+#
+def massvertint(iarr, inc):
+    deta = inc.variables["DNW"][0, :]
+    #
+    # Ugly and unefficient, but numpy.tile and numpy.resize are giving weird
+    # rounding problems. After 1 hour trying to fix it I surrender...
+    #
+    NT, NZ, NJ, NI = iarr.shape
+    deta_3d = np.repeat(np.nan, NZ*NJ*NI).reshape((NZ, NJ, NI))
+    for j in xrange(NJ):
+        for i in xrange(NI):
+            deta_3d[:, j, i] = deta[:]
+    colmass = inc.variables["MU"][:] + inc.variables["MUB"][:]
+    intarr = np.sum(iarr*deta_3d, axis=1)
+    intarr = -colmass*intarr*(1./(9.8))
+    return intarr
 	
 def compute_diagnostic(ivar, inc, onc, bf, plevs):
     if ivar == "MSLP":
@@ -249,7 +271,18 @@ def compute_diagnostic(ivar, inc, onc, bf, plevs):
         ovarobj.description = "High cloud fraction (440-10 hPa)"
         ovarobj.units = "1"
         ovarobj.stagger = ""
-        ovarobj.coordinates = "XLONG XLAT"   
+        ovarobj.coordinates = "XLONG XLAT"
+    elif ivar == "VIM":
+        iarr = inc.variables["QVAPOR"][:]
+        ovardata =  massvertint(iarr, inc)
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj[:] =  ovardata
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XY"
+        ovarobj.description = "Vertically integrated moisture"
+        ovarobj.units = "Kg m-2"
+        ovarobj.stagger = ""
+        ovarobj.coordinates = "XLONG XLAT" 
     return onc
     
 class BasicFields:

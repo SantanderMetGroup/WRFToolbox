@@ -25,7 +25,7 @@ parser.add_option("--verbose", dest="verbose", action="store_true", default=Fals
 #
 ifile = opt.ifile
 ofile = ifile + "_PLEV"
-varlist = opt.varlist.split(",")[1:]
+varlist = opt.varlist.split(",")[:]
 plevs = np.array(opt.plevs.split(",")[1:], dtype=np.float32)
 print "Starting py_interp"
 if opt.verbose:
@@ -47,7 +47,7 @@ inc = ncdf.Dataset(ifile, "r")
 # functions to be computed.
 #
 dims2D=("Time", "south_north", "west_east")
-diagnostics = ["MSLP", "CLT", "CLT_OLD", "CLH", "CLM", "CLL", "GHT", "PRES", "RH", "TT"]
+diagnostics = ["VIM", "MSLP", "CLT", "CLT_OLD", "CLH", "CLM", "CLL", "GHT", "PRES", "RH", "TT"]
 copyvars = []
 interpvars = []
 diags = []
