@@ -4,6 +4,7 @@
 import numpy as np
 import netCDF4 as ncdf
 import sys, os, time
+from py_interp_fortran import routines as f90
 tr = np.transpose # Shorter way to call it
 #
 # Function to copy netCDF structures.
