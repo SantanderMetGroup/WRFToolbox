@@ -27,7 +27,7 @@ parser.add_option("--verbose", dest="verbose", action="store_true", default=Fals
 ifile = opt.ifile
 ofile = ifile + "_PLEV"
 varlist = opt.varlist.split(",")[:]
-plevs = np.array(opt.plevs.split(",")[1:], dtype=np.float32)
+plevs = np.array(opt.plevs.split(",")[:], dtype=np.float32)
 print "Starting py_interp"
 if opt.verbose:
 	print "Input file: %s" % ifile
