@@ -120,7 +120,7 @@ def compute_CLM(ivar, inc, onc, bf, plevs):
         ovarobj[:] =  tr(ovardata)
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XY"
-        ovarobj.description = "Medium cloud fraction (680-400 hPa)"
+        ovarobj.description = "Medium cloud fraction (680-440 hPa)"
         ovarobj.units = "1"
         ovarobj.stagger = ""
         ovarobj.coordinates = "XLONG XLAT"
