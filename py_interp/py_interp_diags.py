@@ -151,3 +151,29 @@ def compute_VIM(ivar, inc, onc, bf, plevs):
         ovarobj.stagger = ""
         ovarobj.coordinates = "XLONG XLAT" 
         return onc
+    
+def compute_VIQC(ivar, inc, onc, bf, plevs):
+        iarr = inc.variables["QCLOUD"][:]
+        ovardata =  massvertint(iarr, inc)
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj[:] =  ovardata
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XY"
+        ovarobj.description = "Vertically integrated cloud water"
+        ovarobj.units = "Kg m-2"
+        ovarobj.stagger = ""
+        ovarobj.coordinates = "XLONG XLAT" 
+        return onc
+
+def compute_VIQI(ivar, inc, onc, bf, plevs):
+        iarr = inc.variables["QICE"][:]
+        ovardata =  massvertint(iarr, inc)
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj[:] =  ovardata
+        ovarobj.FieldType = 104
+        ovarobj.MemoryOrder = "XY"
+        ovarobj.description = "Vertically integrated cloud ice"
+        ovarobj.units = "Kg m-2"
+        ovarobj.stagger = ""
+        ovarobj.coordinates = "XLONG XLAT" 
+        return onc
