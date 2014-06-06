@@ -53,7 +53,10 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
     #
     for ivarname in variables:
         ivarobj = inc.variables[ivarname]
-        ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions)
+        if len(ivarobj.dimensions) > 2:
+            ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions, zlib=True, complevel=4, shuffle=True)
+        else:
+            ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions)
         for attrname, attrvalue in ivarobj.__dict__.iteritems():
             ovarobj.setncattr(attrname, attrvalue)
         if del_boundaries and ((xydims[0] in ovarobj.dimensions) or (xydims[1] in ovarobj.dimensions)):
@@ -75,7 +78,7 @@ def copy_n_filter_wrfout(inc, ofile, copyvars):
     #
     # Copy the input wrfout
     #
-    onc = copy_netcdf_structure(inc, ofile, variables=copyvars,
+    onc = copy_netcdf_structure(inc, ofile, variables=copyvars, oformat='NETCDF4_CLASSIC',
         dimensions=dims, isncobj = True, xydims = ["west_east", "south_north"])
     return onc
 
@@ -126,7 +129,7 @@ def interp2plevs(ivar, inc, onc, bf, plevs):
 	#
 	# Create the output variable and add data and attributes
 	#
-	ovarobj = onc.createVariable(ivar, ivarobj.dtype, ["Time", "num_metgrid_levels", "south_north", "west_east"])
+	ovarobj = onc.createVariable(ivar, ivarobj.dtype, ["Time", "num_metgrid_levels", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
 	ovarobj[:] = tr(ovardata)
 	for attrname, attrvalue in ivarobj.__dict__.iteritems():
 		if attrname == "stagger":

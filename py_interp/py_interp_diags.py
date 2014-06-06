@@ -8,7 +8,7 @@ tr = np.transpose
 
 def compute_MSLP(ivar, inc, onc, bf, plevs):
         ovardata = f90.compute_mslp(tr(bf.pres_field), tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor))
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] = tr(ovardata)
         ovarobj.FieldType  = 104
         ovarobj.MemoryOrder = "Z"
@@ -21,7 +21,7 @@ def compute_MSLP(ivar, inc, onc, bf, plevs):
 def compute_GHT(ivar, inc, onc, bf, plevs):
         ovardata = f90.interp(tr(bf.ght), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
 						linlog=1, extrapolate=1, geopt=True, missing=1.e36)
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] = tr(ovardata)
         ovarobj.FieldType  = 104
         ovarobj.MemoryOrder = "XZY"
@@ -38,7 +38,7 @@ def compute_PRES(ivar, inc, onc, bf, plevs):
         ovardata = np.repeat(np.nan, nt*nplev*nj*ni).reshape(nt, nplev, nj, ni)
         for n in xrange(nplev):
             ovardata[:, n, :, :] = plevs[n]
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"])  
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)  
         ovarobj[:] = ovardata        
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XZY"
@@ -51,7 +51,7 @@ def compute_PRES(ivar, inc, onc, bf, plevs):
 def compute_TT(ivar, inc, onc, bf, plevs):
         ovardata = f90.interp(tr(bf.temp), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
                 linlog=1, extrapolate=1, geopt=False, missing=1.e36)
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] = tr(ovardata)
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XZY"
@@ -64,7 +64,7 @@ def compute_TT(ivar, inc, onc, bf, plevs):
 def compute_RH(ivar, inc, onc, bf, plevs):
         ovardata = f90.interp(tr(bf.rh), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
                 linlog=1, extrapolate=1, geopt=False, missing=1.e36)
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"])  
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "num_metgrid_levels", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)  
         ovarobj[:] = tr(ovardata)
         ovarobj.FieldType = 104 ;
         ovarobj.MemoryOrder = "XZY" ;
@@ -77,7 +77,7 @@ def compute_RH(ivar, inc, onc, bf, plevs):
 def compute_CLT_OLD(ivar, inc, onc, bf, plevs):
         cldfra = inc.variables["CLDFRA"][:]
         ovardata = f90.clt_sundqvist(tr(cldfra))
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] =  tr(ovardata)
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XY"
@@ -90,7 +90,7 @@ def compute_CLT_OLD(ivar, inc, onc, bf, plevs):
 def compute_CLT(ivar, inc, onc, bf, plevs):
         cldfra = inc.variables["CLDFRA"][:]
         ovardata = f90.clt_maxrand(tr(cldfra))
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] =  tr(ovardata)
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XY"
@@ -103,7 +103,7 @@ def compute_CLT(ivar, inc, onc, bf, plevs):
 def compute_CLL(ivar, inc, onc, bf, plevs):
         cldfra = inc.variables["CLDFRA"][:]
         ovardata = f90.clt_maxrand_levels(tr(cldfra), tr(bf.pres_field), maxpres=1000, minpres=680)
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] =  tr(ovardata)
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XY"
@@ -116,7 +116,7 @@ def compute_CLL(ivar, inc, onc, bf, plevs):
 def compute_CLM(ivar, inc, onc, bf, plevs):
         cldfra = inc.variables["CLDFRA"][:]
         ovardata = f90.clt_maxrand_levels(tr(cldfra), tr(bf.pres_field), maxpres=680, minpres=440)
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] =  tr(ovardata)
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XY"
@@ -129,7 +129,7 @@ def compute_CLM(ivar, inc, onc, bf, plevs):
 def compute_CLH(ivar, inc, onc, bf, plevs):
         cldfra = inc.variables["CLDFRA"][:]
         ovardata = f90.clt_maxrand_levels(tr(cldfra), tr(bf.pres_field), maxpres=440, minpres=10)
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] =  tr(ovardata)
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XY"
@@ -142,7 +142,7 @@ def compute_CLH(ivar, inc, onc, bf, plevs):
 def compute_VIM(ivar, inc, onc, bf, plevs):
         iarr = inc.variables["QVAPOR"][:]
         ovardata =  massvertint(iarr, inc)
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] =  ovardata
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XY"
@@ -155,7 +155,7 @@ def compute_VIM(ivar, inc, onc, bf, plevs):
 def compute_VIQC(ivar, inc, onc, bf, plevs):
         iarr = inc.variables["QCLOUD"][:]
         ovardata =  massvertint(iarr, inc)
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] =  ovardata
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XY"
@@ -168,7 +168,7 @@ def compute_VIQC(ivar, inc, onc, bf, plevs):
 def compute_VIQI(ivar, inc, onc, bf, plevs):
         iarr = inc.variables["QICE"][:]
         ovardata =  massvertint(iarr, inc)
-        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"])
+        ovarobj = onc.createVariable(ivar, 'float32', ["Time", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
         ovarobj[:] =  ovardata
         ovarobj.FieldType = 104
         ovarobj.MemoryOrder = "XY"
