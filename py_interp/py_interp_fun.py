@@ -195,7 +195,7 @@ class BasicFields:
         # in m2s-2
         base_ght = inc.variables["PHB"][:]
         perturbation_ght =  inc.variables["PH"][:]
-        ght = base_ght + base_ght
+        ght = base_ght + perturbation_ght
         # de-stagger
         self.ght = (ght[:, 0:-1, :, :] + ght[:, 1:, :, :])/2
     def get_temperature(self, inc):
