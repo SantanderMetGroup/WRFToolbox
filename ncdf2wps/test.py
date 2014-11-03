@@ -55,3 +55,5 @@ writewps_args = {
 }
 
 f90.writewps(**writewps_args) 
+writewps_args["field"] =  "OROG2"
+f90.writewps(**writewps_args)

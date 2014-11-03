@@ -40,6 +40,7 @@ SUBROUTINE writeWPS (OFILE, SLAB, NX, NY, HDATE, XFCST, STARTLOC, FIELD, UNITS, 
 	integer                        :: IFV=5
 	real                           :: EARTH_RADIUS = 6367470. * .001
 	logical                        :: IS_WIND_EARTH_REL = .FALSE.
+        logical                        :: exist
 
 	!====================================================================================!
 	! 
@@ -72,10 +73,18 @@ SUBROUTINE writeWPS (OFILE, SLAB, NX, NY, HDATE, XFCST, STARTLOC, FIELD, UNITS, 
 	!    truelat1/2                                                                      !
 	!    Has the winds been rotated                                                      !
 	!====================================================================================!
-    print  *, 'Writing file ', OFILE
-    open(unit = IUNIT, file = OFILE, FORM = 'UNFORMATTED', position='REWIND')
+    inquire(file=OFILE, exist=exist)
+    if (exist) then
+        print  *, 'Appending record to ', OFILE
+        open(IUNIT, file=OFILE, status="old", position="append", action="write", form='UNFORMATTED')
+    else
+        print  *, 'Writing file ', OFILE
+        open(IUNIT, file=OFILE, status="new", action="write", form='UNFORMATTED')
+    end if
+    !print  *, 'Writing file ', OFILE
+    !open(unit = IUNIT, file = OFILE, FORM = 'UNFORMATTED')
 
-	write (IUNIT, IOSTAT=IERR) 5
+    write (IUNIT, IOSTAT=IERR) 5
 	
 	! WRITE the second record, common to all projections:
 	
