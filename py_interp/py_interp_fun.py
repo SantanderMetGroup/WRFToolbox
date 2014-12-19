@@ -3,15 +3,14 @@
 #
 import numpy as np
 import netCDF4 as ncdf
-import sys, os, time
+import sys, time
 from py_interp_fortran import routines as f90
 tr = np.transpose # Shorter way to call it
 #
 # Function to copy netCDF structures.
 #
 def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = False,
-	del_boundaries = False, boundary_points = 10, xydims = ["x", "y"],
-	oformat = None, del_gattr=False, limtime2unlim=False):
+    xydims = ["x", "y"], oformat = None, del_gattr=False, limtime2unlim=False):
     print "Creating %s netCDF file" % (ofile)
     if isncobj:
         inc = ifile
@@ -34,7 +33,7 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
     for dimname, dimobj in inc.dimensions.iteritems():
         if dimensions:
             if dimname not in dimensions:
-                 continue 
+                continue
         print "Setting dimension %s %s" % (dimname, dimobj)
         if limtime2unlim and dimname == "time":
             onc.createDimension("time", None)
@@ -43,11 +42,7 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
             print "Dimension is unlimited"
             onc.createDimension(dimname, None)
         else:
-            if del_boundaries and dimname in xydims:
-                print "Relaxation zone is going to be deleted from dim %s: Before %i now %i" % (dimname, len(dimobj), len(dimobj) - boundary_points*2)
-                onc.createDimension(dimname, len(dimobj) - boundary_points*2)
-            else:
-                onc.createDimension(dimname, len(dimobj))
+            onc.createDimension(dimname, len(dimobj))
     #
     # Copy variables specified in the argument
     #
@@ -59,11 +54,7 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
             ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions)
         for attrname, attrvalue in ivarobj.__dict__.iteritems():
             ovarobj.setncattr(attrname, attrvalue)
-        if del_boundaries and ((xydims[0] in ovarobj.dimensions) or (xydims[1] in ovarobj.dimensions)):
-            oarray = delete_boundaries(ivarobj[:], boundary_points)
-        else:
-            oarray = ivarobj[:]
-        ovarobj[:] = oarray[:]
+        ovarobj[:] = ivarobj[:]
     onc.sync()
     return onc
 
@@ -83,60 +74,60 @@ def copy_n_filter_wrfout(inc, ofile, copyvars):
     return onc
 
 def add_pressure_axis(onc, plevs):
-	onc.createDimension("num_metgrid_levels", len(plevs))
-	plev = onc.createVariable("PLEV", 'float32', ["num_metgrid_levels"])
-	plev[:] = plevs
-	plev.FieldType  =104
-	plev.MemoryOrder = "Z"
-	plev.description = "Pressure levels"
-	plev.units = "pa"
-	plev.stagger = "-"
-	plev.coordinates = "XLONG XLAT"
-	onc.sync()
-	return onc
+    onc.createDimension("num_metgrid_levels", len(plevs))
+    plev = onc.createVariable("PLEV", 'float32', ["num_metgrid_levels"])
+    plev[:] = plevs
+    plev.FieldType  =104
+    plev.MemoryOrder = "Z"
+    plev.description = "Pressure levels"
+    plev.units = "pa"
+    plev.stagger = "-"
+    plev.coordinates = "XLONG XLAT"
+    onc.sync()
+    return onc	
 
 def is_staggered(varobj):
-	if varobj.stagger != "":
-		return True
-	else:
-		return False
+    if varobj.stagger != "":
+        return True
+    else:
+        return False
 
 def de_stagger(ivarobj, ivardata):
-	dim_staggered = ivarobj.stagger
-	if dim_staggered == "X":
-		ovardata = 0.5*(ivardata[:, :, :, 0:-1] + ivardata[:, :, :, 1:]) 
-	elif dim_staggered == "Y":
-		ovardata = 0.5*(ivardata[:, :, 0:-1, :] + ivardata[:, :, 1:, :]) 
-	elif dim_staggered == "Z":
-		ovardata = 0.5*(ivardata[:, 0:-1, :, :] + ivardata[:, 1:, :, :])
-	return ovardata
-	
+    dim_staggered = ivarobj.stagger
+    if dim_staggered == "X":
+        ovardata = 0.5*(ivardata[:, :, :, 0:-1] + ivardata[:, :, :, 1:]) 
+    elif dim_staggered == "Y":
+        ovardata = 0.5*(ivardata[:, :, 0:-1, :] + ivardata[:, :, 1:, :]) 
+    elif dim_staggered == "Z":
+        ovardata = 0.5*(ivardata[:, 0:-1, :, :] + ivardata[:, 1:, :, :])
+    return ovardata
+    
 def interp2plevs(ivar, inc, onc, bf, plevs):
-	ivarobj = inc.variables[ivar]
-	ivardata = ivarobj[:]
-	#
-	# Check if the variable is staggered and de-stagger it if necessary
-	#
-	if is_staggered(ivarobj):
-		print "Variable %s is staggered, de-staggering" % ivar
-		ivardata = de_stagger(ivarobj, ivardata)
-	#
-	# Call fortran interpolation routine
-	#
-	print "Calling interpolation routine"
-	ovardata = f90.interp(tr(ivardata), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
-						linlog=1, extrapolate=1, geopt=False, missing=1.e36)
-	#
-	# Create the output variable and add data and attributes
-	#
-	ovarobj = onc.createVariable(ivar, ivarobj.dtype, ["Time", "num_metgrid_levels", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
-	ovarobj[:] = tr(ovardata)
-	for attrname, attrvalue in ivarobj.__dict__.iteritems():
-		if attrname == "stagger":
-			ovarobj.setncattr(attrname, "")
-			continue
-		ovarobj.setncattr(attrname, attrvalue)
-	return onc
+    ivarobj = inc.variables[ivar]
+    ivardata = ivarobj[:]
+    #
+    # Check if the variable is staggered and de-stagger it if necessary
+    #
+    if is_staggered(ivarobj):
+        print "Variable %s is staggered, de-staggering" % ivar
+        ivardata = de_stagger(ivarobj, ivardata)
+    #
+    # Call fortran interpolation routine
+    #
+    print "Calling interpolation routine"
+    ovardata = f90.interp(tr(ivardata), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
+                        linlog=1, extrapolate=1, geopt=False, missing=1.e36)
+    #
+    # Create the output variable and add data and attributes
+    #
+    ovarobj = onc.createVariable(ivar, ivarobj.dtype, ["Time", "num_metgrid_levels", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
+    ovarobj[:] = tr(ovardata)
+    for attrname, attrvalue in ivarobj.__dict__.iteritems():
+        if attrname == "stagger":
+            ovarobj.setncattr(attrname, "")
+            continue
+        ovarobj.setncattr(attrname, attrvalue)
+    return onc
 #
 # Function to compute mass-weighted vertical integrals: Input, an array and a netcdf object.
 # As WRF uses an hybrid sigma vertical coordinate, the distance between levels 

@@ -7,8 +7,7 @@ type:
 
 f2py -c py_interp_fortran.F90 -m py_interp_fortran
 
-Check http://pybonacci.wordpress.com/2013/02/22/integrar-fortran-con-python-usando-f2py/
-for a tutorial.
+Check https://sysbio.ioc.ee/projects/f2py2e/ for more info about f2py.
 
 Once compiled, it can be imported into python as a regular python package.
 

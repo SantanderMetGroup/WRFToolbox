@@ -53,17 +53,17 @@ copyvars = []
 interpvars = []
 diags = []
 for var in varlist:
-    if var in diagnostics:
-        diags.append(var)
-    else:
-        if var not in inc.variables.keys():
-            print "Error: Variable %s not found in file, and is not a diagnostic" % var
-            sys.exit(1)
-        vdims = inc.variables[var].dimensions
-        if ("bottom_top" in vdims) or ("bottom_top_stag" in vdims):
-            interpvars.append(var)
-        else:
-            copyvars.append(var)
+	if var in diagnostics:
+		diags.append(var)
+	else:
+		if var not in inc.variables.keys():
+			print "Error: Variable %s not found in file, and is not a diagnostic" % var
+			sys.exit(1)
+		vdims = inc.variables[var].dimensions
+		if ("bottom_top" in vdims) or ("bottom_top_stag" in vdims):
+			interpvars.append(var)
+		else:
+			copyvars.append(var)
 
 if opt.verbose:
 	print "Variables to copy %s" % copyvars
@@ -98,11 +98,11 @@ for var in interpvars:
 # Compute diagnostics
 #
 for var in diags:
-    if opt.verbose: print "Computing diagnostic %s" % var
-    #
-    # Use getattr to get the function from py_interp_diags.py and then call it
-    #
-    compute_diag = getattr(py_interp_diags, "compute_%s" % var)
-    onc = compute_diag(var, inc, onc, bf, plevs)
+	if opt.verbose: print "Computing diagnostic %s" % var
+	#
+	# Use getattr to get the function from py_interp_diags.py and then call it
+	#
+	compute_diag = getattr(py_interp_diags, "compute_%s" % var)
+	onc = compute_diag(var, inc, onc, bf, plevs)
 onc.sync()
 print "SUCCESS: p_interp finished without errors"
