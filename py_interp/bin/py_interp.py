@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 ########################################################################
 #
 # py_interp alpha by Markel Garcia Diez February 2014
@@ -12,12 +14,13 @@ __version__  = '1.0.0'
 __author__   = 'Carlos Blanco'
 __revision__ = "$Id$"
 
-import numpy as np
+import numpy   as np
 import netCDF4 as ncdf
 import os, sys, logging
-import py_interp_diags
-from py_interp_fun import copy_n_filter_wrfout, BasicFields, add_pressure_axis, interp2plevs
-from optparse import OptionParser
+import py_interp.diags
+from py_interp.fun import ( copy_n_filter_wrfout, BasicFields, 
+                            add_pressure_axis, interp2plevs )
+from optparse      import OptionParser
 #
 # Parse options
 #
@@ -109,7 +112,7 @@ try :
 		#
 		# Use getattr to get the function from py_interp_diags.py and then call it
 		#
-		compute_diag = getattr(py_interp_diags, "compute_%s" % var)
+		compute_diag = getattr(py_interp.diags, "compute_%s" % var)
 		onc = compute_diag(var, inc, onc, bf, plevs)
 	onc.sync()
 except Exception as err :

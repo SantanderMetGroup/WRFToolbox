@@ -22,3 +22,7 @@ Now it is possible to make py_interp to be a standalone execulable, though it is
 >> Carlos Blanco 23 Sep 2015 
 
 py_interp is compatible with 2.x and 3.x
+
+>> Carlos Blanco 23 Sep 2015
+
+Created a setup.py file for py_interp

@@ -3,7 +3,7 @@
 #
 import numpy as np
 from py_interp_fortran import routines as f90
-from py_interp_fun import massvertint
+from py_interp.fun import massvertint
 tr = np.transpose
 
 __version__  = '1.0.0'
