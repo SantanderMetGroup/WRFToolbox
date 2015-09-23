@@ -9,7 +9,7 @@ from py_interp_fortran import routines as f90
 
 __version__  = '1.0.0'
 __author__   = 'Carlos Blanco'
-__revision__ = "$Id$
+__revision__ = "$Id$"
 
 tr = np.transpose # Shorter way to call it
 #
