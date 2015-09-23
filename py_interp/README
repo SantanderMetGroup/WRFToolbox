@@ -18,3 +18,7 @@ Usage: type python py_interp.py -h for help.
 >> Markel Garcia Diez 11 Feb 2014
 
 Now it is possible to make py_interp to be a standalone execulable, though it is heavy (14M), using pyinstaller. Use make_executable.sh to build it.
+
+>> Carlos Blanco 23 Sep 2015 
+
+py_interp is compatible with 2.x and 3.x

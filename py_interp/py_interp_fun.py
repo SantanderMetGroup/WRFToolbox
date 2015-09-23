@@ -1,17 +1,23 @@
 #
 # Library with utilities to maniputale netCDF files
 #
+import logging
 import numpy as np
 import netCDF4 as ncdf
 import sys, time
 from py_interp_fortran import routines as f90
+
+__version__  = '1.0.0'
+__author__   = 'Carlos Blanco'
+__revision__ = "$Id$
+
 tr = np.transpose # Shorter way to call it
 #
 # Function to copy netCDF structures.
 #
 def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = False,
     xydims = ["x", "y"], oformat = None, del_gattr=False, limtime2unlim=False):
-    print "Creating %s netCDF file" % (ofile)
+    logging.debug( "Creating %s netCDF file" % (ofile) )
     if isncobj:
         inc = ifile
     else:
@@ -24,22 +30,22 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
     # Copy global attributes and redefine history
     #
     if del_gattr == False:
-        for ikey, ivalue in inc.__dict__.iteritems():
+        for ikey, ivalue in inc.__dict__.items():
             onc.setncattr(ikey, ivalue)
             onc.history = "Created by %s on %s" % (sys.argv[0],time.ctime(time.time()))
     #
     # Copy dimensions
     #
-    for dimname, dimobj in inc.dimensions.iteritems():
+    for dimname, dimobj in inc.dimensions.items():
         if dimensions:
             if dimname not in dimensions:
                 continue
-        print "Setting dimension %s %s" % (dimname, dimobj)
+        logging.info( "Setting dimension %s %s" % (dimname, dimobj) )
         if limtime2unlim and dimname == "time":
             onc.createDimension("time", None)
             continue
         if dimobj.isunlimited():
-            print "Dimension is unlimited"
+            logging.info( "Dimension is unlimited" )
             onc.createDimension(dimname, None)
         else:
             onc.createDimension(dimname, len(dimobj))
@@ -52,7 +58,7 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
             ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions, zlib=True, complevel=4, shuffle=True)
         else:
             ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions)
-        for attrname, attrvalue in ivarobj.__dict__.iteritems():
+        for attrname, attrvalue in ivarobj.__dict__.items():
             ovarobj.setncattr(attrname, attrvalue)
         ovarobj[:] = ivarobj[:]
     onc.sync()
@@ -109,12 +115,12 @@ def interp2plevs(ivar, inc, onc, bf, plevs):
     # Check if the variable is staggered and de-stagger it if necessary
     #
     if is_staggered(ivarobj):
-        print "Variable %s is staggered, de-staggering" % ivar
+        logging.info( "Variable %s is staggered, de-staggering" % ivar )
         ivardata = de_stagger(ivarobj, ivardata)
     #
     # Call fortran interpolation routine
     #
-    print "Calling interpolation routine"
+    logging.info( "Calling interpolation routine" )
     ovardata = f90.interp(tr(ivardata), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
                         linlog=1, extrapolate=1, geopt=False, missing=1.e36)
     #
@@ -122,7 +128,7 @@ def interp2plevs(ivar, inc, onc, bf, plevs):
     #
     ovarobj = onc.createVariable(ivar, ivarobj.dtype, ["Time", "num_metgrid_levels", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
     ovarobj[:] = tr(ovardata)
-    for attrname, attrvalue in ivarobj.__dict__.iteritems():
+    for attrname, attrvalue in ivarobj.__dict__.items():
         if attrname == "stagger":
             ovarobj.setncattr(attrname, "")
             continue
@@ -143,8 +149,8 @@ def massvertint(iarr, inc):
     #
     NT, NZ, NJ, NI = iarr.shape
     deta_3d = np.repeat(np.nan, NZ*NJ*NI).reshape((NZ, NJ, NI))
-    for j in xrange(NJ):
-        for i in xrange(NI):
+    for j in range(NJ):
+        for i in range(NI):
             deta_3d[:, j, i] = deta[:]
     colmass = inc.variables["MU"][:] + inc.variables["MUB"][:]
     intarr = np.sum(iarr*deta_3d, axis=1)
@@ -160,7 +166,7 @@ class BasicFields:
         self.Cp = 7.*self.Rd/2. #  Specific heat (J Kg-1)
         self.RCP = self.Rd/self.Cp
         self.P0 = 100000 # Base pressure for the Poisson equation in Pa
-        print "Reading basic fields..."
+        logging.info( "Reading basic fields..." )
         self.get_sfc_pressure(inc)
         self.get_terrain_height(inc)
         self.get_pressure(inc)
