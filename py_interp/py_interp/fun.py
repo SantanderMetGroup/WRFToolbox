@@ -7,7 +7,7 @@ import netCDF4 as ncdf
 import sys, time
 from py_interp_fortran import routines as f90
 
-__version__  = '1.0.0'
+__version__  = '1.0.2'
 __author__   = 'Carlos Blanco'
 __revision__ = "$Id$"
 
