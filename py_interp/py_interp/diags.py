@@ -452,4 +452,35 @@ def compute_TLAPSE200(ivar, inc, onc, bf, plevs):
     ovarobj.units = "K m-1"
     ovarobj.stagger = ""
     ovarobj.coordinates = "XLONG XLAT"
-    return onc 
+    return onc
+
+def compute_OMEGA(ivar, inc, onc, bf, plevs):
+    """
+    Calculate approximate omega, based on vertical velocity w (dz/dt).
+    It is approximate because it cannot take into account the vertical
+    motion of pressure surfaces.
+    """
+    temp = bf.temp
+    pres = bf.pres_field
+    qvapor = bf.qvapor
+    wobj = inc.variables["W"]
+    vel_w = de_stagger(wobj, wobj[:])
+    grav = 9.81
+    rgas = 287.04
+    eps = 0.622
+    omega = -grav*pres/(rgas*((temp*(eps + qvapor))/(eps*(1.0 + qvapor))))*vel_w
+
+    ovardata = f90.interp(tr(omega), tr(bf.pres_field), plevs, tr(bf.psfc),
+                          tr(bf.hgt), tr(bf.temp), tr(bf.qvapor), linlog=1,
+                          extrapolate=1, geopt=False, missing=1.e36)
+    dim_list = ["Time","num_metgrid_levels", "south_north", "west_east"]
+    ovarobj = onc.createVariable(ivar, 'float32', dim_list, zlib=True, complevel=4, shuffle=True)
+    ovarobj[:] = tr(ovardata)
+    ovarobj.FieldType = 104
+    ovarobj.MemoryOrder = "XYZ"
+    ovarobj.description = "Approximate omega"
+    ovarobj.units = "Pa s-1"
+    ovarobj.stagger = ""
+    ovarobj.coordinates = "XLONG XLAT"
+    return onc
+ 
