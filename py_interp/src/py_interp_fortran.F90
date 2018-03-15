@@ -1231,7 +1231,7 @@ subroutine llsq ( n, x, y, a, b )
   b = ybar - a * xbar
 
   return
-end
+end subroutine llsq
 
 real function getqvl(p,t)
     implicit none
