@@ -93,7 +93,7 @@ def classify_variables(varlist, inc):
     diagnostics = ["VIQC", "VIQI", "VIM", "MSLP", "CLT", "CLT_OLD", "CLH", 
                    "CLM", "CLL", "GHT", "PRES", "RH", "TT", "PBLHh", "WSPD",
                    "WSPD10", "WGUST", "QCLOUDLL", "QICELL", "QSNOWLL", "CAPE", 
-                   "TLAPSE", "TLAPSE200"]
+                   "TLAPSE", "TLAPSE200", "OMEGA"]
     copyvars = []
     interpvars = []
     diags = []
