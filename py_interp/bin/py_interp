@@ -7,18 +7,23 @@
 # See the README for info and/or type python py_interp.py -h for help.
 #
 ########################################################################
-
+import logging
+import os.path
 import py_interp.mainfun as pm
 from optparse import OptionParser
 
 def main():
-	if opt.verbose :
-		level=logging.DEBUG
-	else:
-		level=logging.INFO
-	logging.basicConfig(level=level, format='%(message)s')
     opt, args = parse_args()
+    if opt.verbose :
+        level=logging.DEBUG
+    else:
+        level=logging.INFO
+	logging.basicConfig(level=level, format='%(message)s')
     
+    if not os.path.exists(opt.ifile):
+        logging.error( "ERROR: Input file %s does not exist" % opt.ifile  )
+        sys.exit(1)
+
     plevs = opt.plevs.split(",")
     varlist = opt.varlist.split(",")
     if opt.vars_to_filter is not None:
@@ -26,11 +31,6 @@ def main():
     else:
         vars_to_filter = None
     pm.py_interp_file(opt.ifile, varlist, plevs, vars_to_filter, overwrite=opt.overwrite, verbose=opt.verbose)  
-
-
-if not os.path.exists(opt.ifile):
-    logging.error( "ERROR: Input file %s does not exist" % opt.ifile  )
-    sys.exit(1)
 
 def parse_args():
     parser = OptionParser()
