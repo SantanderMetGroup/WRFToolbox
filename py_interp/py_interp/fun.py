@@ -6,18 +6,18 @@ import numpy as np
 import netCDF4 as ncdf
 import sys, time
 from py_interp_fortran import routines as f90
-
-__version__  = '1.0.2'
-__author__   = 'Carlos Blanco'
-__revision__ = "$Id$"
-
+log = logging.getLogger(__name__)
 tr = np.transpose # Shorter way to call it
 #
 # Function to copy netCDF structures.
 #
-def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = False,
-    xydims = ["x", "y"], oformat = None, del_gattr=False, limtime2unlim=False):
-    logging.debug( "Creating %s netCDF file" % (ofile) )
+def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, 
+                          isncobj = False, xydims = ["x", "y"], oformat = None, 
+                          del_gattr=False, limtime2unlim=False):
+    """
+    Copy the structure of a netCDF file by looking up the __dict__ attributes.
+    """
+    log.debug( "Creating %s netCDF file" % (ofile) )
     if isncobj:
         inc = ifile
     else:
@@ -40,12 +40,12 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
         if dimensions:
             if dimname not in dimensions:
                 continue
-        logging.info( "Setting dimension %s %s" % (dimname, dimobj) )
+        log.debug( "Setting dimension %s %s" % (dimname, dimobj) )
         if limtime2unlim and dimname == "time":
             onc.createDimension("time", None)
             continue
         if dimobj.isunlimited():
-            logging.info( "Dimension is unlimited" )
+            log.debug( "Dimension is unlimited" )
             onc.createDimension(dimname, None)
         else:
             onc.createDimension(dimname, len(dimobj))
@@ -55,9 +55,12 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
     for ivarname in variables:
         ivarobj = inc.variables[ivarname]
         if len(ivarobj.dimensions) > 2:
-            ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions, zlib=True, complevel=4, shuffle=True)
+            ovarobj = onc.createVariable(ivarname, ivarobj.dtype, 
+                                         ivarobj.dimensions, zlib=True, 
+                                         complevel=4, shuffle=True)
         else:
-            ovarobj = onc.createVariable(ivarname, ivarobj.dtype, ivarobj.dimensions)
+            ovarobj = onc.createVariable(ivarname, ivarobj.dtype, 
+                                         ivarobj.dimensions)
         for attrname, attrvalue in ivarobj.__dict__.items():
             ovarobj.setncattr(attrname, attrvalue)
         ovarobj[:] = ivarobj[:]
@@ -65,18 +68,24 @@ def copy_netcdf_structure(ifile, ofile, variables, dimensions=None, isncobj = Fa
     return onc
 
 def copy_n_filter_wrfout(inc, ofile, copyvars):
+    """
+    Copy the wrfout structure removing unwanted dimensions
+    """
     #
     # Check if we need the soil layers dimension
     #
     if ("TSLB" in copyvars) or (("SMOIS" in copyvars) or ("SH2O" in copyvars)):
-        dims = ["Time", "south_north", "west_east", "DateStrLen", "soil_layers_stag"]
+        dims = ["Time", "south_north", "west_east", "DateStrLen", 
+                "soil_layers_stag"]
     else:
         dims = ["Time", "south_north", "west_east", "DateStrLen"]
     #
     # Copy the input wrfout
     #
-    onc = copy_netcdf_structure(inc, ofile, variables=copyvars, oformat='NETCDF4_CLASSIC',
-        dimensions=dims, isncobj = True, xydims = ["west_east", "south_north"])
+    onc = copy_netcdf_structure(inc, ofile, variables=copyvars, 
+                                oformat='NETCDF4_CLASSIC', dimensions=dims, 
+                                isncobj = True, 
+                                xydims = ["west_east", "south_north"])
     return onc
 
 def add_pressure_axis(onc, plevs):
@@ -109,24 +118,30 @@ def de_stagger(ivarobj, ivardata):
     return ovardata
     
 def interp2plevs(ivar, inc, onc, bf, plevs):
+    """
+    Interpolate variable to pressure levels
+    """
     ivarobj = inc.variables[ivar]
     ivardata = ivarobj[:]
     #
     # Check if the variable is staggered and de-stagger it if necessary
     #
     if is_staggered(ivarobj):
-        logging.info( "Variable %s is staggered, de-staggering" % ivar )
+        log.debug( "Variable %s is staggered, de-staggering" % ivar )
         ivardata = de_stagger(ivarobj, ivardata)
     #
     # Call fortran interpolation routine
     #
-    logging.info( "Calling interpolation routine" )
-    ovardata = f90.interp(tr(ivardata), tr(bf.pres_field), plevs, tr(bf.psfc), tr(bf.hgt), tr(bf.temp), tr(bf.qvapor),
-                        linlog=1, extrapolate=1, geopt=False, missing=1.e36)
+    log.debug( "Calling interpolation routine" )
+    ovardata = f90.interp(tr(ivardata), tr(bf.pres_field), plevs, tr(bf.psfc), 
+                          tr(bf.hgt), tr(bf.temp), tr(bf.qvapor), linlog=1, 
+                          extrapolate=1, geopt=False, missing=1.e36)
     #
     # Create the output variable and add data and attributes
     #
-    ovarobj = onc.createVariable(ivar, ivarobj.dtype, ["Time", "num_metgrid_levels", "south_north", "west_east"], zlib=True, complevel=4, shuffle=True)
+    dim_list = ["Time", "num_metgrid_levels", "south_north", "west_east"]
+    ovarobj = onc.createVariable(ivar, ivarobj.dtype, dim_list, zlib=True, 
+                                 complevel=4, shuffle=True)
     ovarobj[:] = tr(ovardata)
     for attrname, attrvalue in ivarobj.__dict__.items():
         if attrname == "stagger":
@@ -134,14 +149,15 @@ def interp2plevs(ivar, inc, onc, bf, plevs):
             continue
         ovarobj.setncattr(attrname, attrvalue)
     return onc
-#
-# Function to compute mass-weighted vertical integrals: Input, an array and a netcdf object.
-# As WRF uses an hybrid sigma vertical coordinate, the distance between levels 
-# ,measured in the eta coordinate, is proportional to the mass differential:
-# dm = -(colmass/g)*deta Where colmass is the total
-# weight of the air columns and g 9.8 m2s-2
-#
+
 def massvertint(iarr, inc):
+    """
+    Function to compute mass-weighted vertical integrals: Input, an array and a
+    netcdf object. As WRF uses an hybrid sigma vertical coordinate, the 
+    distance between levels, measured in the eta coordinate, is proportional 
+    to the mass differential: dm = -(colmass/g)*deta Where colmass is the total
+    weight of the air columns and g 9.8 m2s-2
+    """
     deta = inc.variables["DNW"][0, :]
     #
     # Ugly and unefficient, but numpy.tile and numpy.resize are giving weird
@@ -158,6 +174,11 @@ def massvertint(iarr, inc):
     return intarr
     
 class BasicFields:
+    """
+    Class to compute and store the basic fields needed for other calculations:
+    Surface pressure, terrain height, geopotencial, pressure, temperature,
+    qvapor and relative humidity.
+    """
     def __init__(self, inc):
         #
         # Basic constants
@@ -166,7 +187,7 @@ class BasicFields:
         self.Cp = 7.*self.Rd/2. #  Specific heat (J Kg-1)
         self.RCP = self.Rd/self.Cp
         self.P0 = 100000 # Base pressure for the Poisson equation in Pa
-        logging.info( "Reading basic fields..." )
+        log.debug( "Reading basic fields..." )
         self.get_sfc_pressure(inc)
         self.get_terrain_height(inc)
         self.get_pressure(inc)

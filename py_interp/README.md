@@ -1,28 +1,39 @@
->> Markel Garcia Diez 8 Feb 2013
+# py_interp
 
-py_interp is a version of p_interp written in python. It uses the f2py interface
-to call fortran subroutines extracted from the original p_interp. These are located
-in  py_interp_fortran.F90 inside a module call "routines". To make it a python module
-type:
+Authors: Markel García-Díez (1), Carlos Blanco (2)
 
-f2py -c py_interp_fortran.F90 -m py_interp_fortran
+1. Predictia Intelligent Data Solutions, Santander, Spain
+2. Department of Applied Mathematics and CC, University of Cantabria, Santander, Spain
 
-Check https://sysbio.ioc.ee/projects/f2py2e/ for more info about f2py.
+Thanks to:  Cindy Bruyere, Lluis Fita and Jesús Fernandez which are the authors
+of the original p_interp written in fortran.
 
-Once compiled, it can be imported into python as a regular python package.
+## Description
 
-from py_interp_fortran import routines as f90
+py_interp is a command line tool for interpolating WRF output files to pressure 
+levels, as well as computing a series of diagnostics such as low, medium and 
+high cloud cover. py_interp is a python version of p_interp, originally written
+ in fortran, (see in http://www2.mmm.ucar.edu/wrf/users/). It uses the f2py 
+ interface to call fortran subroutines extracted from the original p_interp.F90. 
 
-Usage: type python py_interp.py -h for help.
+The reason of writing py_interp is that python enables to implement the same 
+functionality in much less lines than fortran, with less redundancies. Thanks 
+to this, is way easier to add and new diagnostics and to debug them. Thanks 
+to f2py, there is not a noticeable loss of performance from the pure 
+fortran version, as the heavy loops are carried out in fortran too. These 
+fortran routines, taken from p_interp, are located in src/py_interp_fortran.F90
+ inside a module call "routines".
 
->> Markel Garcia Diez 11 Feb 2014
+## Install
 
-Now it is possible to make py_interp to be a standalone execulable, though it is heavy (14M), using pyinstaller. Use make_executable.sh to build it.
+py_interp can be installed downloading the source and typing python setup.py 
+install, but the recommended way is to use PyPI.
 
->> Carlos Blanco 23 Sep 2015 
+## Usage
 
-py_interp is compatible with 2.x and 3.x
+Please type python py_interp -h for help.
 
->> Carlos Blanco 23 Sep 2015
+## Standalone executable
 
-Created a setup.py file for py_interp
+It is possible to make py_interp to be a standalone execulable, though it is 
+heavy (14M), using pyinstaller. Use make_executable.sh to build it.
