@@ -1,0 +1,6 @@
+*.pyc
+.settings/
+.project
+.pydevproject
+notebooks/.ipynb_checkpoints/
+build/
