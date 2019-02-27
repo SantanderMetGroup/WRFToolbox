@@ -333,6 +333,95 @@ SUBROUTINE compute_mslp(data_out, pres_field, psfc, ter, tk, qv, ix, iy, iz, it)
 END SUBROUTINE compute_mslp
 
 !---------------------------------------------------------------------
+SUBROUTINE calcslptwo(slp, PP, P_s, PHI_s, T_L, nz, ns, ew, nt)
+! Josipa's subroutine
+IMPLICIT NONE
+
+INTEGER,                INTENT(IN)  :: nz, ns, ew, nt !(input) dimensions: vertical, north-south, east-west
+real, DIMENSION(ew, ns, nt),   INTENT(OUT) :: slp        !(output) sea level pressure
+real, DIMENSION(ew, ns, nz, nt), INTENT(IN)  :: PP         !(input) 3D pressure
+real, DIMENSION(ew, ns, nt),   INTENT(IN)  :: P_s        !(input) pressure at surface
+real, DIMENSION(ew, ns),   INTENT(IN)  :: PHI_s      !(input) 2D geopotential of the surface
+real, DIMENSION(ew, ns, nt),   INTENT(IN)  :: T_L        !(input) temperature at lowest level
+
+
+real, DIMENSION(ew, ns, nt)         :: P_L        !(calculated) pressure at lowest level
+real                                :: T_surf     !(calculated) surface temperature
+real                                :: gamma_mod  !(calculated) modified lapse rate that is actually used for calculations
+real                                :: x          !(calculated) expansion coefficient of (eq. 9)
+real                                :: T_0        !(calculated) auxiliary variable
+
+real, PARAMETER                     :: Rd    = 287.04 ![J kg-1 K-1] (const.) dry air constant
+real, PARAMETER                     :: g     = 9.81   ![m s-2] (const.) acceleration due to gravity
+real, PARAMETER                     :: gamma = 0.0065 ![K m-1] (const.) lapse rate at const. 0.0065 K/m, also denoted as (dT/dz)_st
+integer                             :: j,k,t !loop parameters
+
+!!PRINT *,'this is calcslptwo !!!'
+
+P_L = PP(:,:,1,:)  !extract lowest layer
+
+DO t = 1, nt
+  DO j = 1 , ew
+    DO k = 1 , ns
+
+      !always assume none of the IF conditions trigger, then (according to step 5)
+      gamma_mod = gamma
+
+      !(0) if abs(PHI_s)<0.001 ("sea" grid cells) then set slp to surface pressure
+      IF (ABS(PHI_s(j,k)).lt.0.001) THEN
+
+        slp(j,k,t) = P_s(j,k,t) !in this case we are done with this grid cell
+
+      ELSE !else apply the following algorithm
+
+        !always assume none of the following IF conditions trigger
+        !then we use the constant camma (according to step 5)
+        gamma_mod = gamma
+
+        !(1) compute T_surf according to eq (1)
+        !T_surf = T_L + gamma*(Rd/g)*(P_s/P_L-1.0)*T_L
+        T_surf = T_L(j,k,t) + gamma * (Rd/g) * ( P_s(j,k,t)/P_L(j,k,t) - 1.0 ) * T_L(j,k,t)
+
+        !(2) compute T_0=T_surf+gamma*PHI_s/g
+        T_0 = T_surf + gamma * PHI_s(j,k) / g
+
+        !(3) to avoid extrapolation of too low pressures over high and warm surfaces:
+        ! if (T_0 > 290.5):
+        !    if (T_surf <= 290.5): gamma_mod=(290.5-T_surf)*g/PHI_s (eq. 7)
+        !    else: gamma_mod=0.0, T_surf=0.5*(290.5+T_surf)
+        IF (T_0 .gt. 290.5) THEN
+          IF (T_surf .le. 290.5) THEN
+            gamma_mod = ( 290.5 - T_surf ) * g / PHI_s(j,k)
+          ELSE
+            gamma_mod = 0.0
+            T_surf = 0.5 * ( 290.5 + T_surf )
+          END IF
+        END IF
+
+        !(4) to avoid extrapolation of too high pressures over cold surfaces:
+        ! if T_surf < 255: gamma_mod=gamma, T_surf=0.5*(255+T_surf)
+        IF (T_surf .lt. 255.0) THEN
+          gamma_mod = gamma
+          T_surf = 0.5 * ( 255.0 + T_surf )
+        END IF
+
+        !(5) in other cases set gamma_mod=gamma
+        !this was already done in the beginning of the loop!
+
+        !(6) compute mean sea level pressure (eq. 8) using the above determined parameters
+        !x=gamma_mod*PHI_s/(g*T_surf)
+        !slp=P_s*exp(PHI_s/(R_d*T_surf)*(1-x/2.+x*x/3.))
+        x = gamma_mod * PHI_s(j,k) / ( g * T_surf )
+        slp(j,k,t) = P_s(j,k,t) * EXP( PHI_s(j,k) / (Rd * T_surf ) * (1.0 - x/2. + x*x/3.) )
+
+        !done.
+
+      END IF
+
+    END DO
+  END DO
+END DO
+END SUBROUTINE calcslptwo
 
 SUBROUTINE clt_sundqvist(dx, dy, dz, dt, cldfra, totcloudfr)
 !  Subroutine to compute total cloud cover in base 1. BY LLUIS

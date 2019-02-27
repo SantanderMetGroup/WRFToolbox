@@ -6,7 +6,7 @@ from py_interp_fortran import routines as f90
 from py_interp.fun import massvertint, de_stagger
 tr = np.transpose
 
-def compute_MSLP(ivar, inc, onc, bf, plevs):
+def compute_MSLP_LEGACY(ivar, inc, onc, bf, plevs):
     ovardata = f90.compute_mslp(tr(bf.pres_field), tr(bf.psfc), tr(bf.hgt), 
                                 tr(bf.temp), tr(bf.qvapor))
     dim_list = ["Time", "south_north", "west_east"]
@@ -14,6 +14,25 @@ def compute_MSLP(ivar, inc, onc, bf, plevs):
                                  complevel=4, shuffle=True)
     ovarobj[:] = tr(ovardata)
     ovarobj.FieldType  = 104
+    ovarobj.MemoryOrder = "Z"
+    ovarobj.description = "Pressure levels"
+    ovarobj.units = "pa"
+    ovarobj.stagger = "-"
+    ovarobj.coordinates = "XLONG XLAT"
+    return onc
+
+def compute_MSLP(ivar, inc, onc, bf, plevs):
+    ovardata = f90.calcslptwo(
+        tr(bf.pres_field),
+        tr(bf.psfc),
+        tr(bf.hgt)*9.8,
+        tr(bf.temp)[:, :, 0, :]
+    )
+    dim_list = ["Time", "south_north", "west_east"]
+    ovarobj = onc.createVariable(ivar, 'float32', dim_list, zlib=True,
+                                 complevel=4, shuffle=True)
+    ovarobj[:] = tr(ovardata)
+    ovarobj.FieldType = 104
     ovarobj.MemoryOrder = "Z"
     ovarobj.description = "Pressure levels"
     ovarobj.units = "pa"
