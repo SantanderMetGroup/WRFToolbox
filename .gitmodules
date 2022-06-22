@@ -1,0 +1,3 @@
+[submodule "wrfncxnj"]
+	path = wrfncxnj
+	url = git@github.com:SantanderMetGroup/wrfncxnj.git
